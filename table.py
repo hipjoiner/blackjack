@@ -19,6 +19,7 @@ from rules import Rules, blackjack_payoffs
 from shoe import Shoe
 from dealer import Dealer
 from player import Player
+from deal import Deal
 
 
 class Table:
@@ -38,3 +39,14 @@ class Table:
 
     def __str__(self):
         return f'{blackjack_payoffs[self.rules.blackjack_pays]}|{self.shoe}'
+
+    def deal(self):
+        d = Deal(self)
+        return d
+
+    def show(self):
+        print(f'Rules: {self.rules}')
+        print(f'Table: {self}')
+        print(f'Shoe: {self.shoe}')
+        print(f'Dealer: {self.dealer}')
+        print(f'Player: {self.player}')
