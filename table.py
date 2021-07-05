@@ -15,38 +15,17 @@ Parameters defining a complete table configuration:
             Double after split:             True/False
             Surrender:                      any, any except ace, none
 """
-from rules import Rules, blackjack_payoffs
 from shoe import Shoe
 from dealer import Dealer
-from player import Player
-from deal import Deal
+from bettor import Bettor
 
 
 class Table:
-    def __init__(self, rules=None, shoe=None, dealer=None, player=None):
-        if rules is None:
-            rules = Rules()
+    def __init__(self, rules):
         self.rules = rules
-        if shoe is None:
-            shoe = Shoe(decks=self.rules.decks)
-        self.shoe = shoe
-        if dealer is None:
-            dealer = Dealer(self)
-        self.dealer = dealer
-        if player is None:
-            player = Player(self)
-        self.player = player
+        self.shoe = Shoe(rules.decks)
+        self.dealer = Dealer(self)
+        self.bettor = Bettor(self)
 
     def __str__(self):
-        return f'{blackjack_payoffs[self.rules.blackjack_pays]}|{self.shoe}'
-
-    def deal(self):
-        d = Deal(self)
-        return d
-
-    def show(self):
-        print(f'Rules: {self.rules}')
-        print(f'Table: {self}')
-        print(f'Shoe: {self.shoe}')
-        print(f'Dealer: {self.dealer}')
-        print(f'Player: {self.player}')
+        return f'Dealer/{self.dealer}|Bettor/{self.bettor}'

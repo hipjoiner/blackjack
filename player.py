@@ -1,51 +1,60 @@
-"""
-Parameters defining a complete player configuration:
-    (All of them come from the rules of the table)
-    Doubling options
-    Double after split allowed
-    Split 2 to 10 options
-    Split aces options
-    Split aces draw options
-    Surrender options
-"""
-from rules import double_options, split_2_to_10_options, split_aces_options, split_aces_draw_options, \
-    double_after_split_options, surrender_options
+from hand import Hand
 
 
 class Player:
     def __init__(self, table):
         self.table = table
-
-    @property
-    def double(self):
-        return self.table.rules.double_allowed
-
-    @property
-    def double_after_split(self):
-        return self.table.rules.double_after_split
-
-    @property
-    def split_2_to_10(self):
-        return self.table.rules.split_2_to_10
-
-    @property
-    def split_aces(self):
-        return self.table.rules.split_aces
-
-    @property
-    def split_aces_draw(self):
-        return self.table.rules.split_aces_draw
-
-    @property
-    def surrender(self):
-        return self.table.rules.surrender
+        self.hands = []
 
     def __str__(self):
-        return '|'.join([
-            double_options[self.double],
-            double_after_split_options[self.double_after_split],
-            split_2_to_10_options[self.split_2_to_10],
-            split_aces_options[self.split_aces],
-            split_aces_draw_options[self.split_aces_draw],
-            surrender_options[self.surrender],
-        ])
+        return '|'.join([str(h) for h in self.hands])
+
+    @property
+    def hand(self):
+        if len(self.hands) == 0:
+            return ''
+        return self.hands[0]
+
+    @property
+    def terminal(self):
+        if not self.hands:
+            return False
+        for hand in self.hands:
+            if not hand.terminal:
+                return False
+        return True
+
+    def add_hand(self, hand=None):
+        if hand is None:
+            hand = Hand(self)
+        self.hands.append(hand)
+
+    def choose_play(self, hand):
+        raise NotImplementedError()
+
+    def play(self, n=0):
+        """Play options:
+            Hit
+            Stand
+            Double
+            Split
+            Surrender
+        """
+        p = None
+        for hand in self.hands:
+            if hand.terminal:
+                continue
+            p = self.choose_play(hand)
+            if p == 'Hit':
+                hand.draw()
+            elif p == 'Stand':
+                hand.stand = True
+            elif p == 'Double':
+                pass
+            elif p == 'Split':
+                pass
+            elif p == 'Surrender':
+                pass
+            else:
+                raise ValueError(f'Bad play choice: {p}')
+        return p

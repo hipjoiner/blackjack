@@ -3,7 +3,6 @@ Parameters defining a complete shoe configuration:
     Decks: 1-8
 """
 import random
-from random import randint
 from rules import shoe_decks
 
 
