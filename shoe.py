@@ -12,7 +12,7 @@ class Shoe:
 
     def __init__(self, decks=8):
         self.decks = decks
-        self.cards_left = [decks, decks, decks, decks, decks, decks, decks, decks, decks, decks * 4]
+        self.cards_left = [4 * decks] * 9 + [4 * decks * 4]
         self.cards_drawn = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     def __str__(self):
@@ -21,18 +21,19 @@ class Shoe:
     def cdf(self):
         cards = sum(self.cards_left)
         result = [0.0] * 10
-        p = 0
+        c = 0
         for rank in range(10):
-            result[rank] = p + self.cards_left[rank] / cards
-            p += result[rank]
+            p = self.cards_left[rank] / cards
+            c = c + p
+            result[rank] = c
         return result
 
     def choose_random(self):
         """Choose a random card from what's left in the shoe"""
         cdf = self.cdf()
         r = random.random()
-        for rank in range(0, 10, -1):
-            if r >= cdf[rank]:
+        for rank in range(10):
+            if r < cdf[rank]:
                 return rank
         raise ValueError(f'Choose random failed: seed {r}, cdf {cdf}')
 
