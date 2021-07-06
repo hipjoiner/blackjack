@@ -41,8 +41,7 @@ class Bettor(Player):
         return self.table.rules.surrender
 
     def choose_play(self, hand):
+        """This function governs all player choices about how to play each hand."""
         if hand.total < 17:
-            play = 'Hit'
-        else:
-            play = 'Stand'
-        return play
+            return 'Hit'
+        return 'Stand'

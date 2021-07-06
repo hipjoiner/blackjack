@@ -25,6 +25,17 @@ class Deal:
     def terminal(self):
         return self.bettor.terminal and self.dealer.terminal
 
+    def check_opening_blackjacks(self):
+        """If dealer doesn't peek, then blackjacks are resolved at the end of the hand like everything else.
+        If dealer does peek, then the hand can end, either with a dealer blackjack, OR a player blackjack.
+        Return True here if dealer peek results in a terminal state; False otherwise.
+        """
+        if not self.dealer.peeks_for_blackjack:
+            return False
+        if self.dealer.hand.total == 21 or self.bettor.hand.total == 21:
+            return True
+        return False
+
     def deal_opening_cards(self):
         """Deal 2 opening cards to bettor and player.
         Return True if this step is terminal (blackjack for someone); False if not.
@@ -42,20 +53,24 @@ class Deal:
         """Run n steps of a deal (max_steps 0 means run to termination)."""
         steps = 0
         if not self.dealer.hands:
-            print('Deal...')
+            # Count opening deal as 1 step
+            print('Opening deal...')
             self.deal_opening_cards()
+            # Part of opening deal is dealer peeking for blackjack, if appropriate
             steps += 1
+            if self.check_opening_blackjacks():
+                return
             if 0 < max_steps <= steps:
                 return
         while not self.bettor.terminal:
-            print('Bettor to play: ', end='')
+            print('bettor play: ', end='')
             play = self.bettor.play(1)
             print(play)
             steps += 1
             if 0 < max_steps <= steps:
                 return
         while not self.dealer.terminal:
-            print('Dealer to play: ', end='')
+            print('dealer play: ', end='')
             play = self.dealer.play(1)
             print(play)
             steps += 1

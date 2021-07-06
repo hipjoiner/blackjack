@@ -17,10 +17,14 @@ class Dealer(Player):
         return self.table.rules.dealer_peeks_for_blackjack
 
     def choose_play(self, hand):
-        if hand.total < 17:
-            play = 'Hit'
-        elif hand.total == 17 and hand.soft:
-            play = 'Hit'
-        else:
-            play = 'Stand'
-        return play
+        """Dealer play is always simple:
+            Hit 16 and under, stand on hard 17 and over.
+            For soft 17, depends on table rules.
+        """
+        if hand.total <= 16:
+            return 'Hit'
+        if hand.total == 17 and hand.soft:
+            if self.hits_soft_17:
+                return 'Hit'
+            return 'Stand'
+        return 'Stand'

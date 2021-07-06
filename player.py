@@ -50,11 +50,11 @@ class Player:
             elif p == 'Stand':
                 hand.stand = True
             elif p == 'Double':
-                pass
+                print('<FIXME: implement doubles>')
             elif p == 'Split':
-                pass
+                print('<FIXME: implement splits>')
             elif p == 'Surrender':
-                pass
+                print('<FIXME: implement surrenders>')
             else:
                 raise ValueError(f'Bad play choice: {p}')
         return p
