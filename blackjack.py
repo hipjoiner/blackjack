@@ -1,5 +1,10 @@
 """
 Compute exact expected values for Blackjack play
+TO DO:
+    Identify terminal deal state
+    Define the output string that uniquely identifies terminal deal state
+    Arrange to write terminal state out to file somewhere
+
 """
 from deal import Deal
 from rules import Rules
@@ -16,9 +21,8 @@ def main():
         while not d.terminal:
             if d.dealt:
                 print(f'  {t}; ', end='')
-            d.run(1)
-        print(f'  Final: {t}')
-        print(d)
+            d.run()
+        print(f'  {d}')
         t.clear()
 
 

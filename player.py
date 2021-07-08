@@ -40,29 +40,24 @@ class Player:
     def clear_hands(self):
         self.hands = []
 
-    def play(self, n=0):
-        """Play options:
-            Surrender
-            Split
-            Double
-            Hit
-            Stand
-        """
+    def play(self):
         p = None
         for hand in self.hands:
             if hand.terminal:
                 continue
             p = self.choose_play(hand)
-            if p == 'surrenders':
+            if p == 'draws':
+                hand.draw()             # For split hands, which start a card short
+            elif p == 'surrenders':
                 print('<FIXME: implement surrenders>')
             elif p == 'splits':
-                print('<FIXME: implement splits>')
+                hand.split()
             elif p == 'doubles':
-                print('<FIXME: implement doubles>')
+                hand.double()
             elif p == 'hits':
                 hand.draw()
             elif p == 'stands':
-                hand.stand = True
+                hand.stood = True
             else:
                 raise ValueError(f'Bad play choice: {p}')
-        return p
+            return p

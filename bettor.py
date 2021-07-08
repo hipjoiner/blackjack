@@ -9,11 +9,16 @@ Parameters defining a complete bettor configuration:
     Surrender options
 """
 from player import Player
+from strategy import Strategy
 
 
 class Bettor(Player):
+    def __init__(self, table):
+        super().__init__(table)
+        self.strategy = Strategy()
+
     def __str__(self):
-        return '|'.join([str(h) for h in self.hands])
+        return '/'.join([str(h) for h in self.hands])
 
     @property
     def double(self):
@@ -43,26 +48,14 @@ class Bettor(Player):
         """This function governs all player choices about how to play each hand.
         Initially, we'll implement "optimal" non-counting play strategy.
         """
-        if hand.can_surrender and self.should_surrender(hand):
-            pass
-        if hand.can_split and self.should_split(hand):
-            pass
-        if hand.can_double and self.should_double(hand):
-            pass
-        if hand.can_hit and self.should_hit(hand):
-            pass
-        if hand.total < 17:
+        if hand.num_cards < 2:
+            return 'draws'
+        if hand.can_surrender and self.strategy.surrender(hand, self.dealer.up_card):
+            return 'surrenders'
+        if hand.can_split and self.strategy.split(hand, self.dealer.up_card):
+            return 'splits'
+        if hand.can_double and self.strategy.double(hand, self.dealer.up_card):
+            return 'doubles'
+        if hand.can_hit and self.strategy.hit(hand, self.dealer.up_card):
             return 'hits'
         return 'stands'
-
-    def should_surrender(self, hand):
-        return False
-
-    def should_split(self, hand):
-        return False
-
-    def should_double(self, hand):
-        return False
-
-    def should_hit(self, hand):
-        return False

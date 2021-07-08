@@ -14,7 +14,7 @@ class Deal:
         self.table = table
 
     def __str__(self):
-        return self.result
+        return f'Dealer/{self.dealer}|Bettor/{self.bettor}'
 
     @property
     def bettor(self):
@@ -29,14 +29,8 @@ class Deal:
         return bool(self.dealer.hand)
 
     @property
-    def result(self):
-        if not self.terminal:
-            return 'unfinished'
-        return '\n'.join([f'  Hand #{i + 1}: {hand.final}, {hand.net:+.1f}' for i, hand in enumerate(self.bettor.hands)])
-
-    @property
     def terminal(self):
-        return self.bettor.terminal and self.dealer.terminal
+        return self.dealer.terminal
 
     def check_opening_blackjacks(self):
         """If dealer doesn't peek, then blackjacks are resolved at the end of the hand like everything else.
@@ -62,27 +56,16 @@ class Deal:
         self.dealer.add_hand(dhand)
         self.bettor.add_hand(bhand)
 
-    def run(self, max_steps=0):
-        """Run n steps of a deal (max_steps 0 means run to termination)."""
-        steps = 0
+    def run(self):
+        """Run 1 step of a deal."""
         if not self.dealer.hands:
-            # Count opening deal as 1 step
             self.deal_opening_cards()
-            # Part of opening deal is dealer peeking for blackjack, if appropriate
-            steps += 1
             if self.check_opening_blackjacks():
-                return
-            if 0 < max_steps <= steps:
-                return
-        while not self.bettor.terminal:
-            play = self.bettor.play(1)
+                # FIXME: Handle opening blackjack appropriately (end the hand)
+                pass
+        elif not self.bettor.terminal:
+            play = self.bettor.play()
             print(f'bettor {play}...')
-            steps += 1
-            if 0 < max_steps <= steps:
-                return
-        while not self.dealer.terminal:
-            play = self.dealer.play(1)
+        elif not self.dealer.terminal:
+            play = self.dealer.play()
             print(f'dealer {play}...')
-            steps += 1
-            if 0 < max_steps <= steps:
-                return

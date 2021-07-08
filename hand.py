@@ -22,21 +22,26 @@ card_value = {
 
 
 class Hand:
-    def __init__(self, player):
+    def __init__(self, player, cards=''):
         self.player = player
-        self.cards = ''
-        self.up_card = ''           # First card dealt; only relevant for dealer
-        self.hole_card = ''         # Second card dealt; only relevant for dealer
-        self.extra_cards = ''       # For dealer, all cards after up & hole cards
+        self.up_card = ''               # First card dealt
+        self.hole_card = ''             # Second card dealt
+        self.cards = cards
+        if self.cards:
+            self.up_card = self.cards[0]
+        if len(self.cards) > 1:
+            self.hole_card = self.cards[1]
         self.bet = 1.0
-        self.is_doubled = False
-        self.stand = False
+        self.doubled = False
+        self.stood = False
 
     def __str__(self):
-        s = self.cards
         if self.player == self.dealer:
-            return f'{self.up_card}/{s}({self.total})'
-        return f'{s}({self.total})'
+            return f'{self.up_card}/{self.extra_cards}({self.total})'
+        s = f'{self.cards}({self.total})'
+        if self.outcome != 'Unfinished':
+            s += f'{self.outcome}{self.net:+.1f}'
+        return s
 
     @property
     def bettor(self):
@@ -47,9 +52,18 @@ class Hand:
         return self.total == 21 and self.num_cards == 2 and self.splits == 0
 
     @property
-    def can_surrender(self):
-        """First two cards only, surrender allowed"""
-        return self.first_two and self.rules.surrender
+    def busted(self):
+        return self.total > 21
+
+    @property
+    def can_double(self):
+        """Two cards, plus rules"""
+        return True
+
+    @property
+    def can_hit(self):
+        """FIXME: Can't hit split aces if rules limit; etc."""
+        return True
 
     @property
     def can_split(self):
@@ -62,37 +76,20 @@ class Hand:
             return self.splits < self.rules.split_2_to_10
 
     @property
-    def can_double(self):
-        """Two cards, plus rules"""
-        return True
-
-    @property
-    def can_hit(self):
-        """Can't hit split aces if rules limit; etc."""
-        return True
+    def can_surrender(self):
+        """Only on first two cards, with surrender allowed"""
+        return self.first_two and self.rules.surrender
 
     @property
     def dealer(self):
         return self.player.dealer
 
     @property
-    def final(self):
-        # A hand result that makes it possible to determine amount won/lost (from bettor point of view)
-        if not self.terminal:
-            raise ValueError(f'Attempt to get result of unfinished hand: {self}')
-        if self.blackjack:
-            if self.dealer.hand.blackjack:
-                return 'push'
-            return 'blackjack'
-        if self.total > 21:
-            return 'bust'
-        if self.dealer.hand.total > 21:
-            return 'dealer bust'
-        if self.total > self.dealer.hand.total:
-            return 'win'
-        if self.total < self.dealer.hand.total:
-            return 'lose'
-        return 'push'
+    def extra_cards(self):
+        """For showing dealer hand: extras are all cards after up card"""
+        up_pos = self.cards.find(self.up_card)
+        return self.cards[0:up_pos] + self.cards[up_pos + 1:]
+
 
     @property
     def first_two(self):
@@ -109,18 +106,38 @@ class Hand:
     def net(self):
         # Betting result of the hand
         mult = {
-            'blackjack': self.rules.blackjack_pays,
-            'bust': -1.0,
-            'dealer bust': 1.0,
-            'lose': -1.0,
-            'push': 0.0,
-            'win': 1.0,
+            'Blackjack': self.rules.blackjack_pays,
+            'Bust': -1.0,
+            'DealerBust': 1.0,
+            'Lose': -1.0,
+            'Push': 0.0,
+            'Unfinished': 0.0,
+            'Win': 1.0,
         }
-        return self.bet * mult[self.final]
+        return self.bet * mult[self.outcome]
 
     @property
     def num_cards(self):
         return len(self.cards)
+
+    @property
+    def outcome(self):
+        # A hand result that makes it possible to determine amount won/lost (from bettor point of view)
+        if not self.dealer.terminal:
+            return 'Unfinished'
+        if self.blackjack:
+            if self.dealer.hand.blackjack:
+                return 'Push'
+            return 'Blackjack'
+        if self.total > 21:
+            return 'Bust'
+        if self.dealer.hand.total > 21:
+            return 'DealerBust'
+        if self.total > self.dealer.hand.total:
+            return 'Win'
+        if self.total < self.dealer.hand.total:
+            return 'Lose'
+        return 'Push'
 
     @property
     def paired(self):
@@ -144,30 +161,30 @@ class Hand:
 
     @property
     def terminal(self):
-        if self.total >= 21:
+        if self.busted:
             return True
-        if self.stand:
+        if self.doubled:
             return True
-        if self.is_doubled:
+        if self.stood:
             return True
         return False
 
     @property
     def total(self):
+        """Best hand total <= 21"""
         tot = self.min_total
         if tot <= 11 and 'A' in self.cards:
             tot += 10
         return tot
 
     def double(self):
-        # FIXME: this check needs to be more thorough
-        if self.num_cards != 2:
-            raise ValueError(f"Can't double hand with {self.num_cards} cards ({self.cards})")
+        """Double down"""
         self.bet *= 2.0
         self.draw()
-        self.is_doubled = True
+        self.doubled = True
 
     def draw(self):
+        """Add a card from the shoe"""
         new_card = self.shoe.draw()
         if self.num_cards == 0:
             self.up_card = new_card
@@ -176,4 +193,9 @@ class Hand:
         self.cards = ''.join(sorted(f'{self.cards}{new_card}'))
 
     def split(self):
-        pass
+        """Split this hand.  Add the new hand to the players hands list."""
+        split_card = self.cards[1]
+        self.cards = self.cards[0]
+        self.hole_card = ''
+        new_hand = Hand(self.player, split_card)
+        self.player.add_hand(new_hand)

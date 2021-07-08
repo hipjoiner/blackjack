@@ -9,7 +9,7 @@ from player import Player
 
 class Dealer(Player):
     def __str__(self):
-        return '|'.join([str(h) for h in self.hands])
+        return str(self.hand)
 
     @property
     def hits_soft_17(self):
@@ -19,15 +19,16 @@ class Dealer(Player):
     def peeks_for_blackjack(self):
         return self.table.rules.dealer_peeks_for_blackjack
 
+    @property
+    def up_card(self):
+        return self.hand.up_card
+
     def choose_play(self, hand):
-        """Dealer play is always simple:
-            Hit 16 and under, stand on hard 17 and over.
-            For soft 17, depends on table rules.
-        """
-        if hand.total <= 16:
+        """Dealer play is always simple: hit <17; stand >17; soft 17 depends on table rules."""
+        if hand.total < 17:
             return 'hits'
-        if hand.total == 17 and hand.soft:
-            if self.hits_soft_17:
-                return 'hits'
+        if hand.total > 17:
             return 'stands'
+        if hand.soft and self.hits_soft_17:
+            return 'hits'
         return 'stands'
