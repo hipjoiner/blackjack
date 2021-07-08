@@ -7,22 +7,27 @@ from rules import shoe_decks
 
 
 class Shoe:
-    cards = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T']
+    card_chars = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T']
 
     def __init__(self, decks=8):
         self.decks = decks
-        self.cards_left = [4 * decks] * 9 + [4 * decks * 4]
-        self.cards_drawn = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.cards = self.decks * 52
+        self.cards_drawn = None
+        self.cards_left = None
+        self.shuffle()
 
     def __str__(self):
         return shoe_decks[self.decks]
 
+    def card(self, rank):
+        return self.card_chars[rank]
+
     def cdf(self):
-        cards = sum(self.cards_left)
+        tot_cards_left = sum(self.cards_left)
         result = [0.0] * 10
         c = 0
         for rank in range(10):
-            p = self.cards_left[rank] / cards
+            p = self.cards_left[rank] / tot_cards_left
             c = c + p
             result[rank] = c
         return result
@@ -36,8 +41,9 @@ class Shoe:
                 return rank
         raise ValueError(f'Choose random failed: seed {r}, cdf {cdf}')
 
-    def card(self, rank):
-        return self.cards[rank]
+    def depleted(self):
+        """For now, we'll say 10% of shoe remaining is depleted; time to reshuffle"""
+        return sum(self.cards_left) < self.cards / 10
 
     def draw(self, rank=None):
         """Return a single card; update shoe state.
@@ -55,3 +61,7 @@ class Shoe:
     def draws(self):
         """Return an array of probabilities for all card ranks"""
         pass
+
+    def shuffle(self):
+        self.cards_left = [4 * self.decks] * 9 + [4 * self.decks * 4]
+        self.cards_drawn = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

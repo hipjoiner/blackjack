@@ -13,6 +13,9 @@ class Deal:
     def __init__(self, table):
         self.table = table
 
+    def __str__(self):
+        return self.result
+
     @property
     def bettor(self):
         return self.table.bettor
@@ -20,6 +23,16 @@ class Deal:
     @property
     def dealer(self):
         return self.table.dealer
+
+    @property
+    def dealt(self):
+        return bool(self.dealer.hand)
+
+    @property
+    def result(self):
+        if not self.terminal:
+            return 'unfinished'
+        return '\n'.join([f'  Hand #{i + 1}: {hand.final}, {hand.net:+.1f}' for i, hand in enumerate(self.bettor.hands)])
 
     @property
     def terminal(self):
@@ -54,7 +67,6 @@ class Deal:
         steps = 0
         if not self.dealer.hands:
             # Count opening deal as 1 step
-            print('Opening deal...')
             self.deal_opening_cards()
             # Part of opening deal is dealer peeking for blackjack, if appropriate
             steps += 1
@@ -63,16 +75,14 @@ class Deal:
             if 0 < max_steps <= steps:
                 return
         while not self.bettor.terminal:
-            print('bettor play: ', end='')
             play = self.bettor.play(1)
-            print(play)
+            print(f'bettor {play}...')
             steps += 1
             if 0 < max_steps <= steps:
                 return
         while not self.dealer.terminal:
-            print('dealer play: ', end='')
             play = self.dealer.play(1)
-            print(play)
+            print(f'dealer {play}...')
             steps += 1
             if 0 < max_steps <= steps:
                 return

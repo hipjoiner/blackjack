@@ -12,9 +12,8 @@ from player import Player
 
 
 class Bettor(Player):
-    def __init__(self, table):
-        super().__init__(table)
-        self.splits = 0
+    def __str__(self):
+        return '|'.join([str(h) for h in self.hands])
 
     @property
     def double(self):
@@ -41,7 +40,29 @@ class Bettor(Player):
         return self.table.rules.surrender
 
     def choose_play(self, hand):
-        """This function governs all player choices about how to play each hand."""
+        """This function governs all player choices about how to play each hand.
+        Initially, we'll implement "optimal" non-counting play strategy.
+        """
+        if hand.can_surrender and self.should_surrender(hand):
+            pass
+        if hand.can_split and self.should_split(hand):
+            pass
+        if hand.can_double and self.should_double(hand):
+            pass
+        if hand.can_hit and self.should_hit(hand):
+            pass
         if hand.total < 17:
-            return 'Hit'
-        return 'Stand'
+            return 'hits'
+        return 'stands'
+
+    def should_surrender(self, hand):
+        return False
+
+    def should_split(self, hand):
+        return False
+
+    def should_double(self, hand):
+        return False
+
+    def should_hit(self, hand):
+        return False

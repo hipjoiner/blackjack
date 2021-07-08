@@ -8,6 +8,9 @@ from player import Player
 
 
 class Dealer(Player):
+    def __str__(self):
+        return '|'.join([str(h) for h in self.hands])
+
     @property
     def hits_soft_17(self):
         return self.table.rules.dealer_hits_soft_17
@@ -22,9 +25,9 @@ class Dealer(Player):
             For soft 17, depends on table rules.
         """
         if hand.total <= 16:
-            return 'Hit'
+            return 'hits'
         if hand.total == 17 and hand.soft:
             if self.hits_soft_17:
-                return 'Hit'
-            return 'Stand'
-        return 'Stand'
+                return 'hits'
+            return 'stands'
+        return 'stands'

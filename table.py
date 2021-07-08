@@ -28,4 +28,13 @@ class Table:
         self.bettor = Bettor(self)
 
     def __str__(self):
+        if not self.dealer.hand:
+            return 'No cards'
         return f'Dealer/{self.dealer}|Bettor/{self.bettor}'
+
+    def clear(self):
+        self.dealer.clear_hands()
+        self.bettor.clear_hands()
+        if self.shoe.depleted():
+            print('\nShoe depleted; reshuffling...')
+            self.shoe.shuffle()
