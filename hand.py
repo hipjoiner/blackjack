@@ -37,11 +37,11 @@ class Hand:
 
     def __str__(self):
         if self.player == self.dealer:
-            return f'{self.up_card}/{self.extra_cards}({self.total})'
-        s = f'{self.cards}({self.total})'
-        if self.outcome != 'Unfinished':
-            s += f'{self.outcome}{self.net:+.1f}'
-        return s
+            if not self.bettor.terminal:
+                return f'{self.up_card}x'
+            else:
+                return f'{self.up_card}{self.extra_cards}'
+        return f'{self.cards}'
 
     @property
     def bettor(self):
@@ -58,11 +58,27 @@ class Hand:
     @property
     def can_double(self):
         """Two cards, plus rules"""
-        return True
+        if self.rules.double_allowed == 3:      # No double allowed
+            return False
+        if self.num_cards != 2:
+            return False
+        if self.splits > 0 and not self.rules.double_after_split:
+            return False
+        if self.rules.double_allowed == 0:      # Double any 2
+            return True
+        if self.rules.double_allowed == 1 and self.total in [9, 10, 11]:
+            return True
+        if self.rules.double_allowed == 2 and self.total in [10, 11]:
+            return True
+        return False
 
     @property
     def can_hit(self):
-        """FIXME: Can't hit split aces if rules limit; etc."""
+        """Can't hit split aces if rules limit; etc."""
+        if self.doubled:
+            return False
+        if self.splits > 0 and self.up_card == 'A' and self.rules.split_aces_draw == 1:
+            return False
         return True
 
     @property
@@ -89,7 +105,6 @@ class Hand:
         """For showing dealer hand: extras are all cards after up card"""
         up_pos = self.cards.find(self.up_card)
         return self.cards[0:up_pos] + self.cards[up_pos + 1:]
-
 
     @property
     def first_two(self):
@@ -161,6 +176,10 @@ class Hand:
 
     @property
     def terminal(self):
+        if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.blackjack:
+            return True
+        if self.blackjack:
+            return True
         if self.busted:
             return True
         if self.doubled:

@@ -24,7 +24,16 @@ class Dealer(Player):
         return self.hand.up_card
 
     def choose_play(self, hand):
-        """Dealer play is always simple: hit <17; stand >17; soft 17 depends on table rules."""
+        """For dealer, playing may be unnecessary, if bettor already definitively won or definitively lost.
+        """
+        must_play = False
+        for h in self.bettor.hands:
+            if not h.blackjack and h.total <= 21:
+                must_play = True
+                break
+        if not must_play:
+            return 'stands'
+        """If he has to, dealer play is always simple: hit <17; stand >17; soft 17 depends on table rules."""
         if hand.total < 17:
             return 'hits'
         if hand.total > 17:

@@ -18,7 +18,7 @@ class Bettor(Player):
         self.strategy = Strategy()
 
     def __str__(self):
-        return '/'.join([str(h) for h in self.hands])
+        return '_'.join([str(h) for h in self.hands])
 
     @property
     def double(self):

@@ -11,20 +11,25 @@ from rules import Rules
 from table import Table
 
 
-def main():
+def main(hands):
     r = Rules(blackjack_pays=1.5)
     t = Table(rules=r)
     print(f'Rules: {t.rules}')
-    for h in range(1, 10):
-        print(f'\nHand {h}:')
+    for h in range(hands):
+        print(f'\nHand {h + 1}:')
         d = Deal(t)
+        d.save()
         while not d.terminal:
             if d.dealt:
                 print(f'  {t}; ', end='')
             d.run()
-        print(f'  {d}')
+            d.save()
+        print(f'  {t}')
+        print(f'  End string: {d}')
+        # d.save()
+        print('  Result: ' + '; '.join([f'{h.outcome}, {h.net:+.1f}' for h in d.bettor.hands]))
         t.clear()
 
 
 if __name__ == '__main__':
-    main()
+    main(100)

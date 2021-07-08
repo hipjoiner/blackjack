@@ -30,7 +30,12 @@ class Table:
     def __str__(self):
         if not self.dealer.hand:
             return 'No cards'
-        return f'Dealer/{self.dealer}|Bettor/{self.bettor}'
+        if not self.bettor.terminal:
+            dstr = f'{self.dealer} (?)'
+        else:
+            dstr = f'{self.dealer} ({self.dealer.hand.total})'
+        bstr = ' / '.join([f'{h} ({h.total})' for h in self.bettor.hands])
+        return f'Dealer has {dstr}; bettor has {bstr}'
 
     def clear(self):
         self.dealer.clear_hands()

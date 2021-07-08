@@ -1,3 +1,5 @@
+import os
+
 from hand import Hand
 
 
@@ -10,11 +12,13 @@ class Deal:
     We compute expected value for each of the splits of course, since we are computing recursively,
         but the deal EV is the one of primary interest to us.
     """
+    cache = 'C:/Users/John/blackjack'
+
     def __init__(self, table):
         self.table = table
 
     def __str__(self):
-        return f'Dealer/{self.dealer}|Bettor/{self.bettor}'
+        return f'Dealer-{self.dealer};Bettor-{self.bettor}'
 
     @property
     def bettor(self):
@@ -69,3 +73,10 @@ class Deal:
         elif not self.dealer.terminal:
             play = self.dealer.play()
             print(f'dealer {play}...')
+
+    def save(self):
+        os.makedirs(self.cache, exist_ok=True)
+        fpath = f'{self.cache}/{self}.txt'
+        if not os.path.exists(fpath):
+            with open(fpath, 'w') as fp:
+                fp.write('some data')
