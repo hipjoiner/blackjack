@@ -24,24 +24,22 @@ card_value = {
 class Hand:
     def __init__(self, player, cards=''):
         self.player = player
-        self.up_card = ''               # First card dealt
-        self.hole_card = ''             # Second card dealt
         self.cards = cards
-        if self.cards:
-            self.up_card = self.cards[0]
-        if len(self.cards) > 1:
-            self.hole_card = self.cards[1]
+        self.revealed = True            # Hole card visible; dealer will initially set this False
         self.bet = 1.0
         self.doubled = False
-        self.stood = False
+        self._done = False
 
     def __str__(self):
-        if self.player == self.dealer:
-            if not self.bettor.terminal:
-                return f'{self.up_card}x'
-            else:
-                return f'{self.up_card}{self.extra_cards}'
-        return f'{self.cards}'
+        if self.player == self.bettor:
+            return self.cards
+        if not self.dealer.hand or not self.dealer.hand.num_cards:
+            return ''
+        if self.dealer.hand.num_cards == 1:
+            return self.up_card
+        if not self.dealer.hand.revealed:
+            return f'{self.up_card}x'
+        return self.cards
 
     @property
     def bettor(self):
@@ -101,21 +99,46 @@ class Hand:
         return self.player.dealer
 
     @property
-    def extra_cards(self):
-        """For showing dealer hand: extras are all cards after up card"""
-        up_pos = self.cards.find(self.up_card)
-        return self.cards[0:up_pos] + self.cards[up_pos + 1:]
+    def done(self):
+        """Has player finished playing the hand?"""
+        if self._done:
+            return True
+        if not self.revealed:
+            return False
+        if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.blackjack:
+            self._done = True
+        if self.blackjack:
+            self._done = True
+        if self.busted:
+            self._done = True
+        if self.doubled:
+            self._done = True
+        return self._done
+
+    @done.setter
+    def done(self, value):
+        self._done = value
+
+    @property
+    def final(self):
+        """Is the eventual result of the hand already determined, irrespective of opponent actions?
+        This will be so if I have a blackjack or a busted hand.
+        """
+        return self.blackjack or self.busted
 
     @property
     def first_two(self):
         return self.num_cards == 2 and self.splits == 0
 
     @property
+    def hole_card(self):
+        if self.num_cards < 2:
+            return ''
+        return self.cards[1]
+
+    @property
     def min_total(self):
-        tot = 0
-        for c in self.cards:
-            tot += card_value[c]
-        return tot
+        return sum([card_value[c] for c in self.cards])
 
     @property
     def net(self):
@@ -138,7 +161,7 @@ class Hand:
     @property
     def outcome(self):
         # A hand result that makes it possible to determine amount won/lost (from bettor point of view)
-        if not self.dealer.terminal:
+        if not self.dealer.done:
             return 'Unfinished'
         if self.blackjack:
             if self.dealer.hand.blackjack:
@@ -175,26 +198,18 @@ class Hand:
         return len(self.player.hands) - 1
 
     @property
-    def terminal(self):
-        if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.blackjack:
-            return True
-        if self.blackjack:
-            return True
-        if self.busted:
-            return True
-        if self.doubled:
-            return True
-        if self.stood:
-            return True
-        return False
-
-    @property
     def total(self):
         """Best hand total <= 21"""
         tot = self.min_total
         if tot <= 11 and 'A' in self.cards:
             tot += 10
         return tot
+
+    @property
+    def up_card(self):
+        if self.num_cards < 1:
+            return ''
+        return self.cards[0]
 
     def double(self):
         """Double down"""
@@ -205,16 +220,12 @@ class Hand:
     def draw(self):
         """Add a card from the shoe"""
         new_card = self.shoe.draw()
-        if self.num_cards == 0:
-            self.up_card = new_card
-        elif self.num_cards == 1:
-            self.hole_card = new_card
-        self.cards = ''.join(sorted(f'{self.cards}{new_card}'))
+        self.cards += new_card
+        return new_card
 
     def split(self):
         """Split this hand.  Add the new hand to the players hands list."""
         split_card = self.cards[1]
         self.cards = self.cards[0]
-        self.hole_card = ''
         new_hand = Hand(self.player, split_card)
         self.player.add_hand(new_hand)

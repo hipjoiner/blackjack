@@ -19,17 +19,17 @@ def main(hands):
         print(f'\nHand {h + 1}:')
         d = Deal(t)
         d.save()
-        while not d.terminal:
+        while not d.done:
             if d.dealt:
-                print(f'  {t}; ', end='')
+                print(f'  {d}  {t}; {d.cards}; ', end='')
             d.run()
             d.save()
-        print(f'  {t}')
-        print(f'  End string: {d}')
+        print(f'  {d}  {t}; {d.cards}')
         # d.save()
         print('  Result: ' + '; '.join([f'{h.outcome}, {h.net:+.1f}' for h in d.bettor.hands]))
         t.clear()
 
 
 if __name__ == '__main__':
-    main(100)
+    deals = 3
+    main(deals)

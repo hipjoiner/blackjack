@@ -1,7 +1,5 @@
 import os
 
-from hand import Hand
-
 
 class Deal:
     """
@@ -25,58 +23,71 @@ class Deal:
         return self.table.bettor
 
     @property
+    def cards(self):
+        """Full sequence of cards dealt during this deal, in order."""
+        d = self.dealer.cards
+        b = self.bettor.cards
+        hole_card = ''
+        if self.dealer.num_cards >= 2:
+            hole_card = 'x'
+            if self.dealer.hand.revealed:
+                hole_card = d[1:2]
+        s = b[:1] + d[:1] + b[1:2] + hole_card + b[2:] + d[2:]
+        return s
+
+    @property
+    def num_cards(self):
+        return len(self.cards)
+
+    @property
     def dealer(self):
         return self.table.dealer
 
     @property
     def dealt(self):
-        return bool(self.dealer.hand)
+        return self.dealer.hand and self.dealer.hand.num_cards >= 2
 
     @property
-    def terminal(self):
-        return self.dealer.terminal
+    def done(self):
+        return self.dealer.done
 
-    def check_opening_blackjacks(self):
-        """If dealer doesn't peek, then blackjacks are resolved at the end of the hand like everything else.
-        If dealer does peek, then the hand can end, either with a dealer blackjack, OR a player blackjack.
-        Return True here if dealer peek results in a terminal state; False otherwise.
-        """
-        if not self.dealer.peeks_for_blackjack:
-            return False
-        if self.dealer.hand.total == 21 or self.bettor.hand.total == 21:
-            return True
-        return False
-
-    def deal_opening_cards(self):
-        """Deal 2 opening cards to bettor and player.
-        Return True if this step is terminal (blackjack for someone); False if not.
-        """
-        dhand = Hand(self.dealer)
-        bhand = Hand(self.bettor)
-        dhand.draw()
-        bhand.draw()
-        dhand.draw()
-        bhand.draw()
-        self.dealer.add_hand(dhand)
-        self.bettor.add_hand(bhand)
+    @property
+    def fname(self):
+        return f'Cards-{self.num_cards};Dealer-{self.dealer};Bettor-{self.bettor}.txt'
 
     def run(self):
         """Run 1 step of a deal."""
-        if not self.dealer.hands:
-            self.deal_opening_cards()
-            if self.check_opening_blackjacks():
-                # FIXME: Handle opening blackjack appropriately (end the hand)
-                pass
-        elif not self.bettor.terminal:
+        if self.dealer.num_hands == 0:
+            self.bettor.add_hand()
+            self.dealer.add_hand()
+            self.dealer.hand.revealed = False
+        elif self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 0:
+            self.bettor.draw()
+        elif self.dealer.hand.num_cards == 0:
+            self.dealer.draw()
+        elif self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 1:
+            self.bettor.draw()
+        elif self.dealer.hand.num_cards == 1:
+            self.dealer.draw()
+        elif not self.bettor.done:
             play = self.bettor.play()
             print(f'bettor {play}...')
-        elif not self.dealer.terminal:
+        elif not self.dealer.done:
             play = self.dealer.play()
             print(f'dealer {play}...')
 
     def save(self):
         os.makedirs(self.cache, exist_ok=True)
-        fpath = f'{self.cache}/{self}.txt'
-        if not os.path.exists(fpath):
-            with open(fpath, 'w') as fp:
-                fp.write('some data')
+        fpath = f'{self.cache}/{self.fname}'
+        if os.path.exists(fpath):
+            return
+        with open(fpath, 'w') as fp:
+            """Data to save:
+                Cards total
+                Dealer cards
+                Player cards
+                All possible next play actions
+                    Future state resulting from play action
+                    If action involves taking a card, all future states with probability of each
+            """
+            fp.write('some data')

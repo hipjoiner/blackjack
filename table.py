@@ -30,7 +30,7 @@ class Table:
     def __str__(self):
         if not self.dealer.hand:
             return 'No cards'
-        if not self.bettor.terminal:
+        if not self.dealer.hand.revealed:
             dstr = f'{self.dealer} (?)'
         else:
             dstr = f'{self.dealer} ({self.dealer.hand.total})'
@@ -38,8 +38,8 @@ class Table:
         return f'Dealer has {dstr}; bettor has {bstr}'
 
     def clear(self):
-        self.dealer.clear_hands()
-        self.bettor.clear_hands()
+        self.dealer.clear()
+        self.bettor.clear()
         if self.shoe.depleted():
             print('\nShoe depleted; reshuffling...')
             self.shoe.shuffle()

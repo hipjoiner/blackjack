@@ -21,6 +21,22 @@ class Bettor(Player):
         return '_'.join([str(h) for h in self.hands])
 
     @property
+    def done(self):
+        if self._done:
+            return True
+        self._done = True
+        if not self.hands:
+            self._done = False
+        for hand in self.hands:
+            if not hand.done:
+                self._done = False
+        return self._done
+
+    @done.setter
+    def done(self, value):
+        self._done = value
+
+    @property
     def double(self):
         return self.table.rules.double_allowed
 
