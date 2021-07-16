@@ -14,12 +14,20 @@ class Dealer(Player):
         return str(self.hand)
 
     @property
+    def blackjack(self):
+        return self.hand.blackjack
+
+    @property
+    def busted(self):
+        return self.hand.busted
+
+    @property
     def done(self):
         if self._done:
             return True
         if self.hand and not self.hand.revealed:
             return False
-        if self.bettor.final:
+        if not self.bettor.live:
             self._done = True
         if self.hand and self.hand.done:
             self._done = True
@@ -38,17 +46,21 @@ class Dealer(Player):
         return self.table.rules.dealer_peeks_for_blackjack
 
     @property
+    def total(self):
+        return self.hand.total
+
+    @property
     def up_card(self):
         return self.hand.up_card
 
     def choose_play(self, hand):
         """Dealer play is always simple: hit <17; stand >17; soft 17 depends on table rules."""
         if not hand.revealed:
-            return 'reveals'
+            return 'Reveal'
         if hand.total < 17:
-            return 'hits'
+            return 'Hit'
         if hand.total > 17:
-            return 'stands'
+            return 'Stand'
         if hand.soft and self.hits_soft_17:
-            return 'hits'
-        return 'stands'
+            return 'Hit'
+        return 'Stand'

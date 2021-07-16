@@ -2,6 +2,16 @@ from hand import Hand
 
 
 class Player:
+    valid_plays = [
+        'Double',
+        'Draw',
+        'Hit',
+        'Reveal',
+        'Split',
+        'Stand',
+        'Surrender',
+    ]
+
     def __init__(self, table):
         self.table = table
         self.hands = []
@@ -25,22 +35,23 @@ class Player:
         raise NotImplementedError()
 
     @property
-    def final(self):
-        """Is the eventual result of all my hands already determined, irrespective of opponent actions?
-        This will be so if I have all final hands (blackjacks or busted)
-        """
-        if self.num_hands == 0:
-            return False
-        for h in self.hands:
-            if not h.final:
-                return False
-        return True
-
-    @property
     def hand(self):
         if len(self.hands) == 0:
             return None
         return self.hands[0]
+
+    @property
+    def live(self):
+        """Is the eventual result of all my hands already determined, irrespective of opponent actions?
+        This will be so if I have all final hands (blackjacks or busted)
+        """
+        if self.num_hands == 0:
+            return True
+        for h in self.hands:
+            # Blackjack, surrendered, or busted?
+            if not (h.blackjack or h.surrendered or h.busted):
+                return True
+        return False
 
     @property
     def num_cards(self):
@@ -65,30 +76,25 @@ class Player:
         self.cards = ''
         self.done = False
 
-    def draw(self, hand=None):
-        if hand is None:
-            hand = self.hand
-        self.cards += hand.draw()
-
     def play(self):
         p = None
         for hand in self.hands:
             if hand.done:
                 continue
             p = self.choose_play(hand)
-            if p == 'draws':
-                self.draw(hand)         # For split hands, which start a card short
-            elif p == 'reveals':        # Dealer reveals his hole card
+            if p == 'Draw':
+                hand.draw()       # For split hands, which start a card short
+            elif p == 'Reveal':                 # Dealer reveals his hole card
                 hand.revealed = True
-            elif p == 'surrenders':
-                print('<FIXME: implement surrenders>')
-            elif p == 'splits':
+            elif p == 'Surrender':
+                hand.surrender()
+            elif p == 'Split':
                 hand.split()
-            elif p == 'doubles':
+            elif p == 'Double':
                 hand.double()
-            elif p == 'hits':
-                self.draw(hand)
-            elif p == 'stands':
+            elif p == 'Hit':
+                hand.draw()
+            elif p == 'Stand':
                 hand._done = True
             else:
                 raise ValueError(f'Bad play choice: {p}')

@@ -25,12 +25,15 @@ class Hand:
     def __init__(self, player, cards=''):
         self.player = player
         self.cards = cards
-        self.revealed = True            # Hole card visible; dealer will initially set this False
         self.bet = 1.0
+        self.revealed = True            # Hole card visible; dealer will initially set this False
         self.doubled = False
+        self.surrendered = False
         self._done = False
 
     def __str__(self):
+        if not self.cards:
+            return 'empty'
         if self.player == self.bettor:
             return self.cards
         if not self.dealer.hand or not self.dealer.hand.num_cards:
@@ -100,11 +103,9 @@ class Hand:
 
     @property
     def done(self):
-        """Has player finished playing the hand?"""
+        """Has player finished playing the hand, either by choice or by rule requirements?"""
         if self._done:
             return True
-        if not self.revealed:
-            return False
         if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.blackjack:
             self._done = True
         if self.blackjack:
@@ -113,18 +114,13 @@ class Hand:
             self._done = True
         if self.doubled:
             self._done = True
+        if self.surrendered:
+            self._done = True
         return self._done
 
     @done.setter
     def done(self, value):
         self._done = value
-
-    @property
-    def final(self):
-        """Is the eventual result of the hand already determined, irrespective of opponent actions?
-        This will be so if I have a blackjack or a busted hand.
-        """
-        return self.blackjack or self.busted
 
     @property
     def first_two(self):
@@ -142,44 +138,47 @@ class Hand:
 
     @property
     def net(self):
-        # Betting result of the hand
-        mult = {
-            'Blackjack': self.rules.blackjack_pays,
-            'Bust': -1.0,
-            'DealerBust': 1.0,
-            'Lose': -1.0,
-            'Push': 0.0,
-            'Unfinished': 0.0,
-            'Win': 1.0,
-        }
-        return self.bet * mult[self.outcome]
+        """Betting result of the hand; always from player point of view"""
+        if self.result == 'Won':
+            if self.blackjack:
+                return self.bet * self.rules.blackjack_pays
+            return self.bet
+        if self.result == 'Lost':
+            return -self.bet
+        return 0.0
 
     @property
     def num_cards(self):
         return len(self.cards)
 
     @property
-    def outcome(self):
-        # A hand result that makes it possible to determine amount won/lost (from bettor point of view)
-        if not self.dealer.done:
-            return 'Unfinished'
-        if self.blackjack:
-            if self.dealer.hand.blackjack:
-                return 'Push'
-            return 'Blackjack'
-        if self.total > 21:
-            return 'Bust'
-        if self.dealer.hand.total > 21:
-            return 'DealerBust'
-        if self.total > self.dealer.hand.total:
-            return 'Win'
-        if self.total < self.dealer.hand.total:
-            return 'Lose'
-        return 'Push'
-
-    @property
     def paired(self):
         return self.num_cards == 2 and self.cards[0] == self.cards[1]
+
+    @property
+    def result(self):
+        """Won, lost, or push?  Always from the bettor's point of view.
+        (Can't make sense from dealer's point of view, because dealer may face multiple bettor hands.)
+        """
+        if not self.dealer.done:
+            raise ValueError('Attempt to check result before hand has finished play.')
+        if self.blackjack:
+            if self.dealer.blackjack:
+                return 'Push'
+            return 'Won'
+        if self.dealer.blackjack:
+            return 'Lost'
+        if self.surrendered:
+            return 'Lost'
+        if self.total > 21:
+            return 'Lost'
+        if self.dealer.total > 21:
+            return 'Won'
+        if self.total > self.dealer.total:
+            return 'Won'
+        if self.total < self.dealer.total:
+            return 'Lost'
+        return 'Push'
 
     @property
     def rules(self):
@@ -221,6 +220,7 @@ class Hand:
         """Add a card from the shoe"""
         new_card = self.shoe.draw()
         self.cards += new_card
+        self.player.cards += new_card
         return new_card
 
     def split(self):
@@ -229,3 +229,6 @@ class Hand:
         self.cards = self.cards[0]
         new_hand = Hand(self.player, split_card)
         self.player.add_hand(new_hand)
+
+    def surrender(self):
+        self.surrendered = True

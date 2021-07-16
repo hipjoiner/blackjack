@@ -23,14 +23,16 @@ class Shoe:
         return self.card_chars[rank]
 
     def cdf(self):
-        tot_cards_left = sum(self.cards_left)
         result = [0.0] * 10
         c = 0
         for rank in range(10):
-            p = self.cards_left[rank] / tot_cards_left
-            c = c + p
+            c = c + self.pdf()[rank]
             result[rank] = c
         return result
+
+    def pdf(self):
+        tot_cards_left = sum(self.cards_left)
+        return [self.cards_left[rank] / tot_cards_left for rank in range(10)]
 
     def choose_random(self):
         """Choose a random card from what's left in the shoe"""

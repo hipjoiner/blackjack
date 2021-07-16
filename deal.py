@@ -1,3 +1,4 @@
+import json
 import os
 
 
@@ -14,9 +15,11 @@ class Deal:
 
     def __init__(self, table):
         self.table = table
+        self.history = []
+        self.save()
 
     def __str__(self):
-        return f'Dealer-{self.dealer};Bettor-{self.bettor}'
+        return self.status
 
     @property
     def bettor(self):
@@ -33,11 +36,9 @@ class Deal:
             if self.dealer.hand.revealed:
                 hole_card = d[1:2]
         s = b[:1] + d[:1] + b[1:2] + hole_card + b[2:] + d[2:]
+        if not s:
+            return 'none'
         return s
-
-    @property
-    def num_cards(self):
-        return len(self.cards)
 
     @property
     def dealer(self):
@@ -53,34 +54,68 @@ class Deal:
 
     @property
     def fname(self):
-        return f'Cards-{self.num_cards};Dealer-{self.dealer};Bettor-{self.bettor}.txt'
+        """Sequence of cards dealt, in order (with dealer hole card visible)"""
+        return f'Cards-{self.cards}.txt'
+
+    @property
+    def num_cards(self):
+        return len(self.cards)
+
+    @property
+    def shoe(self):
+        return self.table.shoe
+
+    @property
+    def status(self):
+        if self.dealer.num_hands == 0:
+            return ''
+        c = f'Cards-{self.cards}'
+        if not self.dealer.hand:
+            return c
+        if not self.dealer.hand.revealed:
+            dstr = f'{self.dealer} (?)'
+        else:
+            dstr = f'{self.dealer} ({self.dealer.hand.total})'
+        bstr = '_'.join([f'{h} ({h.total})' for h in self.bettor.hands])
+        t = f'Dealer-{dstr}; Bettor-{bstr}'
+        return f'{c}; {t}'
 
     def run(self):
         """Run 1 step of a deal."""
+        action = ''
+        self.history.append(self.status)
         if self.dealer.num_hands == 0:
             self.bettor.add_hand()
             self.dealer.add_hand()
             self.dealer.hand.revealed = False
-        elif self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 0:
-            self.bettor.draw()
+            return ''
+        if self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 0:
+            self.bettor.hand.draw()
+            action = 'Deal'
         elif self.dealer.hand.num_cards == 0:
-            self.dealer.draw()
+            self.dealer.hand.draw()
+            action = 'Deal'
         elif self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 1:
-            self.bettor.draw()
+            self.bettor.hand.draw()
+            action = 'Deal'
         elif self.dealer.hand.num_cards == 1:
-            self.dealer.draw()
+            self.dealer.hand.draw()
+            action = 'Deal'
         elif not self.bettor.done:
             play = self.bettor.play()
-            print(f'bettor {play}...')
+            action = f'Bettor {play}'
         elif not self.dealer.done:
             play = self.dealer.play()
-            print(f'dealer {play}...')
+            action = f'Dealer {play}'
+        if action:
+            self.history.append(action)
+        return action
 
     def save(self):
         os.makedirs(self.cache, exist_ok=True)
         fpath = f'{self.cache}/{self.fname}'
-        if os.path.exists(fpath):
-            return
+        # if os.path.exists(fpath):
+        #     return
         with open(fpath, 'w') as fp:
             """Data to save:
                 Cards total
@@ -90,4 +125,19 @@ class Deal:
                     Future state resulting from play action
                     If action involves taking a card, all future states with probability of each
             """
-            fp.write('some data')
+            done = self.dealer.done
+            if done:
+                nxt = None
+                net = self.bettor.net
+            else:
+                nxt = dict(zip(self.shoe.card_chars, self.shoe.pdf()))
+                net = None
+
+            data = {
+                'Cards': self.cards,
+                'Play': self.history + [self.status],
+                'Final': done,
+                'Net': net,
+                'Next': nxt,
+            }
+            json.dump(data, fp, indent=2)

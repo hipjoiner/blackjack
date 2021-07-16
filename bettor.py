@@ -45,6 +45,10 @@ class Bettor(Player):
         return self.table.rules.double_after_split
 
     @property
+    def net(self):
+        return sum([h.net for h in self.hands])
+
+    @property
     def split_2_to_10(self):
         return self.table.rules.split_2_to_10
 
@@ -64,14 +68,17 @@ class Bettor(Player):
         """This function governs all player choices about how to play each hand.
         Initially, we'll implement "optimal" non-counting play strategy.
         """
+        """FIXME: Other "plays" include blackjack, bust, win, lose, push.
+        These make the hand final, removing the need for subsequent dealer action.
+        """
         if hand.num_cards < 2:
-            return 'draws'
+            return 'Draw'
         if hand.can_surrender and self.strategy.surrender(hand, self.dealer.up_card):
-            return 'surrenders'
+            return 'Surrender'
         if hand.can_split and self.strategy.split(hand, self.dealer.up_card):
-            return 'splits'
+            return 'Split'
         if hand.can_double and self.strategy.double(hand, self.dealer.up_card):
-            return 'doubles'
+            return 'Double'
         if hand.can_hit and self.strategy.hit(hand, self.dealer.up_card):
-            return 'hits'
-        return 'stands'
+            return 'Hit'
+        return 'Stand'

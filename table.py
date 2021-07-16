@@ -18,6 +18,7 @@ Parameters defining a complete table configuration:
 from shoe import Shoe
 from dealer import Dealer
 from bettor import Bettor
+from deal import Deal
 
 
 class Table:
@@ -26,16 +27,12 @@ class Table:
         self.shoe = Shoe(rules.decks)
         self.dealer = Dealer(self)
         self.bettor = Bettor(self)
+        self.deal = None
 
     def __str__(self):
-        if not self.dealer.hand:
-            return 'No cards'
-        if not self.dealer.hand.revealed:
-            dstr = f'{self.dealer} (?)'
-        else:
-            dstr = f'{self.dealer} ({self.dealer.hand.total})'
-        bstr = ' / '.join([f'{h} ({h.total})' for h in self.bettor.hands])
-        return f'Dealer has {dstr}; bettor has {bstr}'
+        if self.deal is None:
+            return 'Empty table'
+        return str(self.deal)
 
     def clear(self):
         self.dealer.clear()
@@ -43,3 +40,16 @@ class Table:
         if self.shoe.depleted():
             print('\nShoe depleted; reshuffling...')
             self.shoe.shuffle()
+
+    def deal_hand(self):
+        self.deal = Deal(self)
+        while not self.deal.done:
+            if str(self.deal):
+                print(f'{self.deal}; ', end='')
+            play = self.deal.run()
+            if play:
+                print(play)
+            self.deal.save()
+        print(self.deal)
+        print('Result: ' + '; '.join([f'{h.result} {h.net}' for h in self.bettor.hands]))
+        print(f'Net: {self.bettor.net}')

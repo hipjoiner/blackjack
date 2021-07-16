@@ -6,7 +6,6 @@ TO DO:
     Arrange to write terminal state out to file somewhere
 
 """
-from deal import Deal
 from rules import Rules
 from table import Table
 
@@ -16,20 +15,11 @@ def main(hands):
     t = Table(rules=r)
     print(f'Rules: {t.rules}')
     for h in range(hands):
-        print(f'\nHand {h + 1}:')
-        d = Deal(t)
-        d.save()
-        while not d.done:
-            if d.dealt:
-                print(f'  {d}  {t}; {d.cards}; ', end='')
-            d.run()
-            d.save()
-        print(f'  {d}  {t}; {d.cards}')
-        # d.save()
-        print('  Result: ' + '; '.join([f'{h.outcome}, {h.net:+.1f}' for h in d.bettor.hands]))
         t.clear()
+        print(f'\nHand #{h + 1}:')
+        t.deal_hand()
 
 
 if __name__ == '__main__':
-    deals = 3
+    deals = 1
     main(deals)
