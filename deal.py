@@ -19,7 +19,7 @@ class Deal:
         self.save()
 
     def __str__(self):
-        return self.status
+        return self.state
 
     @property
     def bettor(self):
@@ -55,7 +55,11 @@ class Deal:
     @property
     def fname(self):
         """Sequence of cards dealt, in order (with dealer hole card visible)"""
-        return f'Cards-{self.cards}.txt'
+        return f'{self.state}.txt'
+
+    @property
+    def next_to_play(self):
+        return '<incomplete>'
 
     @property
     def num_cards(self):
@@ -66,29 +70,22 @@ class Deal:
         return self.table.shoe
 
     @property
-    def status(self):
-        if self.dealer.num_hands == 0:
-            return ''
-        c = f'Cards-{self.cards}'
-        if not self.dealer.hand:
-            return c
-        if not self.dealer.hand.revealed:
-            dstr = f'{self.dealer} (?)'
-        else:
-            dstr = f'{self.dealer} ({self.dealer.hand.total})'
-        bstr = '_'.join([f'{h} ({h.total})' for h in self.bettor.hands])
-        t = f'Dealer-{dstr}; Bettor-{bstr}'
-        return f'{c}; {t}'
+    def state(self):
+        d = str(self.dealer.hand)
+        if d == 'None':
+            d = ''
+        b = [f'{str(h)}' for h in self.bettor.hands]
+        if not b:
+            b = ['']
+        return '-'.join(['Deal'] + [d] + b)
+
+    def clear(self):
+        self.dealer.clear()
+        self.bettor.clear()
 
     def run(self):
         """Run 1 step of a deal."""
-        action = ''
-        self.history.append(self.status)
-        if self.dealer.num_hands == 0:
-            self.bettor.add_hand()
-            self.dealer.add_hand()
-            self.dealer.hand.revealed = False
-            return ''
+        self.history.append(self.state)
         if self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 0:
             self.bettor.hand.draw()
             action = 'Deal'
@@ -107,8 +104,9 @@ class Deal:
         elif not self.dealer.done:
             play = self.dealer.play()
             action = f'Dealer {play}'
-        if action:
-            self.history.append(action)
+        else:
+            action = 'Final'
+        self.history.append(action)
         return action
 
     def save(self):
@@ -118,26 +116,33 @@ class Deal:
         #     return
         with open(fpath, 'w') as fp:
             """Data to save:
-                Cards total
-                Dealer cards
-                Player cards
-                All possible next play actions
+                Card sequence
+                Deal history
+                Next to play
+                Play options; for each:
                     Future state resulting from play action
                     If action involves taking a card, all future states with probability of each
             """
             done = self.dealer.done
+            nxt = self.next_to_play
             if done:
-                nxt = None
+                pdf = None
                 net = self.bettor.net
             else:
-                nxt = dict(zip(self.shoe.card_chars, self.shoe.pdf()))
+                pdf = dict(zip(self.shoe.card_chars, self.shoe.pdf()))
                 net = None
+
+            options = {
+                'Bettor': self.bettor.hand.options(),
+                'Dealer': self.dealer.hand.options(),
+            }
 
             data = {
                 'Cards': self.cards,
-                'Play': self.history + [self.status],
-                'Final': done,
+                'History': self.history + [self.state],
                 'Net': net,
                 'Next': nxt,
+                'Pdf': pdf,
+                'Options': options,
             }
             json.dump(data, fp, indent=2)

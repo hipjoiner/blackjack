@@ -14,7 +14,7 @@ class Player:
 
     def __init__(self, table):
         self.table = table
-        self.hands = []
+        self.hands = [Hand(self)]
         self.cards = ''         # Raw card deal sequence, irrespective of splits
         self._done = False
 
@@ -72,30 +72,34 @@ class Player:
         raise NotImplementedError()
 
     def clear(self):
-        self.hands = []
+        self.hands = [Hand(self)]
         self.cards = ''
         self.done = False
 
+    def hand_to_play(self):
+        """Determine player's hand that is next to make a play.
+        Here we number the hands starting with 1, 2, etc, so that values of
+        0 and None-- boolean False-- all represent no hands being playable.
+        """
+        for i, hand in enumerate(self.hands):
+            if not hand.done:
+                return i + 1
+        return None
+
     def play(self):
-        p = None
         for hand in self.hands:
             if hand.done:
                 continue
             p = self.choose_play(hand)
-            if p == 'Draw':
-                hand.draw()       # For split hands, which start a card short
-            elif p == 'Reveal':                 # Dealer reveals his hole card
-                hand.revealed = True
-            elif p == 'Surrender':
-                hand.surrender()
-            elif p == 'Split':
-                hand.split()
-            elif p == 'Double':
-                hand.double()
-            elif p == 'Hit':
-                hand.draw()
-            elif p == 'Stand':
-                hand._done = True
-            else:
-                raise ValueError(f'Bad play choice: {p}')
+            hand_fns = {
+                'Double': hand.double,
+                'Draw': hand.draw,
+                'Hit': hand.draw,
+                'Reveal': hand.reveal,
+                'Split': hand.split,
+                'Stand': hand.stand,
+                'Surrender': hand.surrender,
+            }
+            fn = hand_fns[p]
+            fn()
             return p

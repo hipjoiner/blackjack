@@ -25,9 +25,10 @@ class Table:
     def __init__(self, rules):
         self.rules = rules
         self.shoe = Shoe(rules.decks)
+        self.bettor = None
         self.dealer = Dealer(self)
         self.bettor = Bettor(self)
-        self.deal = None
+        self.deal = Deal(self)
 
     def __str__(self):
         if self.deal is None:
@@ -35,14 +36,12 @@ class Table:
         return str(self.deal)
 
     def clear(self):
-        self.dealer.clear()
-        self.bettor.clear()
+        self.deal.clear()
         if self.shoe.depleted():
             print('\nShoe depleted; reshuffling...')
             self.shoe.shuffle()
 
     def deal_hand(self):
-        self.deal = Deal(self)
         while not self.deal.done:
             if str(self.deal):
                 print(f'{self.deal}; ', end='')

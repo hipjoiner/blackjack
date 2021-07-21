@@ -26,27 +26,33 @@ class Hand:
         self.player = player
         self.cards = cards
         self.bet = 1.0
-        self.revealed = True            # Hole card visible; dealer will initially set this False
+        self.peeked = False                             # Dealer peeked at hole card for blackjack?
+        self.revealed = self.player == self.bettor      # Hole card visible; if dealer, initially False
         self.doubled = False
         self.surrendered = False
+        self.stood = False
         self._done = False
 
     def __str__(self):
-        if not self.cards:
-            return 'empty'
-        if self.player == self.bettor:
-            return self.cards
-        if not self.dealer.hand or not self.dealer.hand.num_cards:
-            return ''
-        if self.dealer.hand.num_cards == 1:
-            return self.up_card
-        if not self.dealer.hand.revealed:
-            return f'{self.up_card}x'
-        return self.cards
+        s = self.cards
+        if self.player == self.dealer:
+            if self.num_cards > 1 and not self.revealed:
+                s = f'{s[:1]}x'
+            if self.rules.dealer_peeks_for_blackjack and self.peeked:
+                s = f'{s}K'
+        if self.stood:
+            s = f'{s}S'
+        if self.doubled:
+            s = f'{s}D'
+        return s
 
     @property
     def bettor(self):
         return self.player.bettor
+
+    @property
+    def bettor_hand(self):
+        return self.player == self.bettor
 
     @property
     def blackjack(self):
@@ -65,6 +71,8 @@ class Hand:
             return False
         if self.splits > 0 and not self.rules.double_after_split:
             return False
+        if self.splits > 0 and self.up_card == 'A' and self.rules.split_aces_draw == 1:
+            return False
         if self.rules.double_allowed == 0:      # Double any 2
             return True
         if self.rules.double_allowed == 1 and self.total in [9, 10, 11]:
@@ -74,11 +82,40 @@ class Hand:
         return False
 
     @property
+    def can_draw(self):
+        return self.num_cards < 2
+
+    @property
     def can_hit(self):
         """Can't hit split aces if rules limit; etc."""
         if self.doubled:
             return False
         if self.splits > 0 and self.up_card == 'A' and self.rules.split_aces_draw == 1:
+            return False
+        return True
+
+    @property
+    def can_peek(self):
+        """Can this (dealer's) hand peek now for blackjack?"""
+        if not self.rules.dealer_peeks_for_blackjack:
+            return False
+        if not self.dealer_hand:
+            return False
+        if self.num_cards != 2 or self.bettor.num_hands != 1 or self.bettor.hand.num_cards != 2:
+            return False
+        if self.up_card not in ['A', 'T']:
+            return False
+        if self.revealed:
+            return False
+        return True
+
+    @property
+    def can_reveal(self):
+        if not self.dealer_hand:
+            return False
+        if not self.player.done:
+            return False
+        if self.revealed:
             return False
         return True
 
@@ -93,6 +130,14 @@ class Hand:
             return self.splits < self.rules.split_2_to_10
 
     @property
+    def can_stand(self):
+        if self.num_cards < 2:
+            return False
+        if self.total > 20:
+            return False
+        return True
+
+    @property
     def can_surrender(self):
         """Only on first two cards, with surrender allowed"""
         return self.first_two and self.rules.surrender
@@ -100,6 +145,10 @@ class Hand:
     @property
     def dealer(self):
         return self.player.dealer
+
+    @property
+    def dealer_hand(self):
+        return self.player == self.dealer
 
     @property
     def done(self):
@@ -113,6 +162,8 @@ class Hand:
         if self.busted:
             self._done = True
         if self.doubled:
+            self._done = True
+        if self.stood:
             self._done = True
         if self.surrendered:
             self._done = True
@@ -223,12 +274,48 @@ class Hand:
         self.player.cards += new_card
         return new_card
 
+    def options(self):
+        """All play options available currently for this hand.
+            C   Draw [1 card]
+            K   Peek [for blackjack]
+            T   Reveal [hole card]
+            R   Surrender
+            P   Split
+            D   Double
+            H   Hit
+            S   Stand
+        """
+        result = []
+        if self.can_draw:
+            result.append('Draw')
+        if self.can_peek:
+            result.append('Peek')
+        if self.can_reveal:
+            result.append('Reveal')
+        if self.can_surrender:
+            result.append('Surrender')
+        if self.can_split:
+            result.append('Split')
+        if self.can_double:
+            result.append('Double')
+        if self.can_hit:
+            result.append('Hit')
+        if self.can_stand:
+            result.append('Stand')
+        return result
+
+    def reveal(self):
+        self.revealed = True
+
     def split(self):
         """Split this hand.  Add the new hand to the players hands list."""
         split_card = self.cards[1]
         self.cards = self.cards[0]
         new_hand = Hand(self.player, split_card)
         self.player.add_hand(new_hand)
+
+    def stand(self):
+        self.stood = True
 
     def surrender(self):
         self.surrendered = True
