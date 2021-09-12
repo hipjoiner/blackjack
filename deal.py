@@ -19,7 +19,7 @@ class Deal:
         self.save()
 
     def __str__(self):
-        return self.state
+        return self.state()
 
     @property
     def bettor(self):
@@ -37,7 +37,7 @@ class Deal:
                 hole_card = d[1:2]
         s = b[:1] + d[:1] + b[1:2] + hole_card + b[2:] + d[2:]
         if not s:
-            return 'none'
+            return ''
         return s
 
     @property
@@ -55,11 +55,60 @@ class Deal:
     @property
     def fname(self):
         """Sequence of cards dealt, in order (with dealer hole card visible)"""
-        return f'{self.state}.txt'
+        return f'{self.state()}.txt'
+
+    @property
+    def next_hand(self):
+        """Return reference to next hand to play, or None if all hands are done"""
+        player = self.next_player
+        for i, hand in enumerate(player.hands):
+            if not hand.done:
+                return hand
+        return None
+
+    @property
+    def next_player(self):
+        """Return reference to next player to play, or None if all players are done"""
+        # Dealing phase
+        if self.bettor.hand.num_cards == 0:
+            return self.bettor
+        if self.dealer.hand.num_cards == 0:
+            return self.dealer
+        if self.bettor.hand.num_cards == 1:
+            return self.bettor
+        if self.dealer.hand.num_cards == 1:
+            return self.dealer
+        if self.dealer.hand.can_peek:
+            return self.dealer
+        # After deal
+        for i, hand in enumerate(self.bettor.hands):
+            if not hand.done:
+                return self.bettor
+        if not self.dealer.done:
+            return self.dealer
+        return None
 
     @property
     def next_to_play(self):
-        return '<incomplete>'
+        """Determine player and hand having next option to play; None if hand is complete."""
+        # Dealing phase
+        if self.bettor.hand.num_cards == 0:
+            return 'Bettor 1'
+        if self.dealer.hand.num_cards == 0:
+            return 'Dealer'
+        if self.bettor.hand.num_cards == 1:
+            return 'Bettor 1'
+        if self.dealer.hand.num_cards == 1:
+            return 'Dealer'
+        if self.dealer.hand.can_peek:
+            return 'Dealer'
+        # After deal, straightforward
+        for i, hand in enumerate(self.bettor.hands):
+            if not hand.done:
+                return f'Bettor {i + 1}'
+        if not self.dealer.done:
+            return 'Dealer'
+        return None
 
     @property
     def num_cards(self):
@@ -69,23 +118,13 @@ class Deal:
     def shoe(self):
         return self.table.shoe
 
-    @property
-    def state(self):
-        d = str(self.dealer.hand)
-        if d == 'None':
-            d = ''
-        b = [f'{str(h)}' for h in self.bettor.hands]
-        if not b:
-            b = ['']
-        return '-'.join(['Deal'] + [d] + b)
-
     def clear(self):
         self.dealer.clear()
         self.bettor.clear()
 
     def run(self):
         """Run 1 step of a deal."""
-        self.history.append(self.state)
+        self.history.append(self.state())
         if self.bettor.num_hands == 1 and self.bettor.hand.num_cards == 0:
             self.bettor.hand.draw()
             action = 'Deal'
@@ -124,25 +163,53 @@ class Deal:
                     If action involves taking a card, all future states with probability of each
             """
             done = self.dealer.done
-            nxt = self.next_to_play
+            to_play = self.next_to_play
+            net = None
+            pdf = None
             if done:
-                pdf = None
                 net = self.bettor.net
             else:
-                pdf = dict(zip(self.shoe.card_chars, self.shoe.pdf()))
-                net = None
-
-            options = {
-                'Bettor': self.bettor.hand.options(),
-                'Dealer': self.dealer.hand.options(),
-            }
+                pdf = self.shoe.card_pdf()
+            options = self.next_player.hand.options()
+            opt_pdfs = {}
+            for option in options:
+                if self.next_hand:
+                    next_hands = self.next_hand.next_states(option)
+                    next_states = {}
+                    for h, prob in next_hands.items():
+                        if to_play.startswith('Dealer'):
+                            next_state = self.state(dealer_hand=h)
+                        else:
+                            # FIXME: This won't work with multiple (split) bettor hands in play
+                            next_state = self.state(bettor_hands=[h])
+                        next_states[next_state] = prob
+                    opt_pdfs[option] = next_states
+                else:
+                    opt_pdfs[option] = ''
 
             data = {
                 'Cards': self.cards,
-                'History': self.history + [self.state],
+                'History': self.history + [self.state()],
                 'Net': net,
-                'Next': nxt,
+                'Next': to_play,
                 'Pdf': pdf,
-                'Options': options,
+                'Options': {
+                    to_play: opt_pdfs
+                },
             }
             json.dump(data, fp, indent=2)
+
+    def state(self, dealer_hand=None, bettor_hands=None):
+        if dealer_hand:
+            d = dealer_hand
+        else:
+            d = str(self.dealer.hand)
+            if d == 'None':
+                d = ''
+        if bettor_hands:
+            b = bettor_hands
+        else:
+            b = [f'{str(h)}' for h in self.bettor.hands]
+            if not b:
+                b = ['']
+        return '-'.join(['Deal'] + [d] + b)

@@ -41,6 +41,14 @@ class Player:
         return self.hands[0]
 
     @property
+    def is_bettor(self):
+        return self == self.table.bettor
+
+    @property
+    def is_dealer(self):
+        return self == self.table.dealer
+
+    @property
     def live(self):
         """Is the eventual result of all my hands already determined, irrespective of opponent actions?
         This will be so if I have all final hands (blackjacks or busted)

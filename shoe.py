@@ -20,7 +20,12 @@ class Shoe:
         return shoe_decks[self.decks]
 
     def card(self, rank):
+        """Return character representation of card, given numerical rank"""
         return self.card_chars[rank]
+
+    def card_pdf(self):
+        """Return dict by card character giving draw probability from pdf"""
+        return dict(zip(self.card_chars, self.pdf()))
 
     def cdf(self):
         result = [0.0] * 10
@@ -31,6 +36,7 @@ class Shoe:
         return result
 
     def pdf(self):
+        """Array of probabilities of draw, ordered by rank"""
         tot_cards_left = sum(self.cards_left)
         return [self.cards_left[rank] / tot_cards_left for rank in range(10)]
 

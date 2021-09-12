@@ -34,17 +34,7 @@ class Hand:
         self._done = False
 
     def __str__(self):
-        s = self.cards
-        if self.player == self.dealer:
-            if self.num_cards > 1 and not self.revealed:
-                s = f'{s[:1]}x'
-            if self.rules.dealer_peeks_for_blackjack and self.peeked:
-                s = f'{s}K'
-        if self.stood:
-            s = f'{s}S'
-        if self.doubled:
-            s = f'{s}D'
-        return s
+        return self.state
 
     @property
     def bettor(self):
@@ -248,6 +238,20 @@ class Hand:
         return len(self.player.hands) - 1
 
     @property
+    def state(self):
+        s = self.cards
+        if self.player.is_dealer:
+            if self.num_cards > 1 and not self.revealed:
+                s = f'{s[:1]}x'
+            if self.peeked:
+                s = f'{s}K'
+        if self.stood:
+            s = f'{s}S'
+        if self.doubled:
+            s = f'{s}D'
+        return s
+
+    @property
     def total(self):
         """Best hand total <= 21"""
         tot = self.min_total
@@ -274,6 +278,34 @@ class Hand:
         self.player.cards += new_card
         return new_card
 
+    def next_state(self, action=None, card=''):
+        """Hypothetical next state"""
+        if action == 'Surrender':
+            return f'{self.state}R'
+        if action == 'Split':
+            return f'{self.cards[0]}{card}_{self.cards[1]}'
+        s = f'{self.cards}{card}'
+        if self.player.is_dealer:
+            # Special dealer actions are Peek, Reveal
+            if len(s) > 1 and not self.revealed and action != 'Reveal':
+                s = f'{s[:1]}x'
+            if self.peeked or action == 'Peek':
+                s = f'{s}K'
+        if self.stood or action == 'Stand':
+            s = f'{s}S'
+        if self.doubled or action == 'Double':
+            s = f'{s}D'
+        return s
+
+    def next_states(self, action):
+        """All possible next states based on pdf and action"""
+        card_pdf = self.shoe.card_pdf()
+        states_pdf = {}
+        for card, prob in card_pdf.items():
+            new_state = self.next_state(action, card)
+            states_pdf[new_state] = card_pdf[card]
+        return states_pdf
+
     def options(self):
         """All play options available currently for this hand.
             C   Draw [1 card]
@@ -285,11 +317,13 @@ class Hand:
             H   Hit
             S   Stand
         """
-        result = []
         if self.can_draw:
-            result.append('Draw')
+            # If Draw is an option, it is the only option-- you're getting a card
+            return ['Draw']
         if self.can_peek:
-            result.append('Peek')
+            # Likewise Peek
+            return ['Peek']
+        result = []
         if self.can_reveal:
             result.append('Reveal')
         if self.can_surrender:
@@ -304,11 +338,14 @@ class Hand:
             result.append('Stand')
         return result
 
+    def peek(self):
+        self.peeked = True
+
     def reveal(self):
         self.revealed = True
 
     def split(self):
-        """Split this hand.  Add the new hand to the players hands list."""
+        """Split this hand.  Add the new hand to the player's hands list."""
         split_card = self.cards[1]
         self.cards = self.cards[0]
         new_hand = Hand(self.player, split_card)
