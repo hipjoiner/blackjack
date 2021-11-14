@@ -41,18 +41,6 @@ class Hand:
         return self.player.bettor
 
     @property
-    def bettor_hand(self):
-        return self.player == self.bettor
-
-    @property
-    def blackjack(self):
-        return self.total == 21 and self.num_cards == 2 and self.splits == 0
-
-    @property
-    def busted(self):
-        return self.total > 21
-
-    @property
     def can_double(self):
         """Two cards, plus rules"""
         if self.rules.double_allowed == 3:      # No double allowed
@@ -145,11 +133,11 @@ class Hand:
         """Has player finished playing the hand, either by choice or by rule requirements?"""
         if self._done:
             return True
-        if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.blackjack:
+        if self.rules.dealer_peeks_for_blackjack and self.dealer.hand.is_blackjack:
             self._done = True
-        if self.blackjack:
+        if self.is_blackjack:
             self._done = True
-        if self.busted:
+        if self.is_busted:
             self._done = True
         if self.doubled:
             self._done = True
@@ -174,6 +162,18 @@ class Hand:
         return self.cards[1]
 
     @property
+    def is_bettor_hand(self):
+        return self.player == self.bettor
+
+    @property
+    def is_blackjack(self):
+        return self.total == 21 and self.num_cards == 2 and self.splits == 0
+
+    @property
+    def is_busted(self):
+        return self.total > 21
+
+    @property
     def min_total(self):
         return sum([card_value[c] for c in self.cards])
 
@@ -181,7 +181,7 @@ class Hand:
     def net(self):
         """Betting result of the hand; always from player point of view"""
         if self.result == 'Won':
-            if self.blackjack:
+            if self.is_blackjack:
                 return self.bet * self.rules.blackjack_pays
             return self.bet
         if self.result == 'Lost':
@@ -203,11 +203,11 @@ class Hand:
         """
         if not self.dealer.done:
             raise ValueError('Attempt to check result before hand has finished play.')
-        if self.blackjack:
-            if self.dealer.blackjack:
+        if self.is_blackjack:
+            if self.dealer.hand.is_blackjack:
                 return 'Push'
             return 'Won'
-        if self.dealer.blackjack:
+        if self.dealer.hand.is_blackjack:
             return 'Lost'
         if self.surrendered:
             return 'Lost'

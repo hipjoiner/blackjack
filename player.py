@@ -1,25 +1,29 @@
 from hand import Hand
+from strategy import Strategy
 
 
 class Player:
     valid_plays = [
-        'Double',
         'Draw',
-        'Hit',
         'Reveal',
-        'Split',
-        'Stand',
         'Surrender',
+        'Split',
+        'Double',
+        'Hit',
+        'Stand',
     ]
 
-    def __init__(self, table):
+    def __init__(self, table, strategy_name):
         self.table = table
+        self.strategy = Strategy(strategy_name)
         self.hands = [Hand(self)]
         self.cards = ''         # Raw card deal sequence, irrespective of splits
         self._done = False
 
     @property
     def bettor(self):
+        if not hasattr(self.table, 'bettor'):
+            return None
         return self.table.bettor
 
     @property
@@ -57,7 +61,7 @@ class Player:
             return True
         for h in self.hands:
             # Blackjack, surrendered, or busted?
-            if not (h.blackjack or h.surrendered or h.busted):
+            if not (h.is_blackjack or h.surrendered or h.is_busted):
                 return True
         return False
 

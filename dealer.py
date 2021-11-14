@@ -15,11 +15,11 @@ class Dealer(Player):
 
     @property
     def blackjack(self):
-        return self.hand.blackjack
+        return self.hand.is_blackjack
 
     @property
     def busted(self):
-        return self.hand.busted
+        return self.hand.is_busted
 
     @property
     def done(self):

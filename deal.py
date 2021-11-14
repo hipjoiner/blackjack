@@ -1,18 +1,17 @@
 import json
 import os
 
+from config import cache
+
 
 class Deal:
     """
-    A Deal is a fully dealt round of blackjack, options exhausted, hands final, wins/losses all determined.
-    A Deal incorporates both player activity and dealer activity.
-    The Deal is the focus for computation of expected value.
+    A Deal is a specific dealt round of blackjack, whether complete or not.
+    A Deal is our state engine, and the focus for computation of expected value.
     The Deal will start with a single bettor hand, but the bettor may split into two or more hands.
     We compute expected value for each of the splits of course, since we are computing recursively,
         but the deal EV is the one of primary interest to us.
     """
-    cache = 'C:/Users/John/blackjack'
-
     def __init__(self, table):
         self.table = table
         self.history = []
@@ -27,18 +26,7 @@ class Deal:
 
     @property
     def cards(self):
-        """Full sequence of cards dealt during this deal, in order."""
-        d = self.dealer.cards
-        b = self.bettor.cards
-        hole_card = ''
-        if self.dealer.num_cards >= 2:
-            hole_card = 'x'
-            if self.dealer.hand.revealed:
-                hole_card = d[1:2]
-        s = b[:1] + d[:1] + b[1:2] + hole_card + b[2:] + d[2:]
-        if not s:
-            return ''
-        return s
+        return self.table.shoe.deal_sequence
 
     @property
     def dealer(self):
@@ -53,9 +41,13 @@ class Deal:
         return self.dealer.done
 
     @property
-    def fname(self):
-        """Sequence of cards dealt, in order (with dealer hole card visible)"""
-        return f'{self.state()}.txt'
+    def fpath(self):
+        os.makedirs(f'{cache}/deals/{self.table.name}', exist_ok=True)
+        return f'{cache}/deals/{self.table.name}/{self.name}.json'
+
+    @property
+    def name(self):
+        return f'{self.table.name}-{self.cards}'
 
     @property
     def next_hand(self):
@@ -137,6 +129,9 @@ class Deal:
         elif self.dealer.hand.num_cards == 1:
             self.dealer.hand.draw()
             action = 'Deal'
+        elif self.dealer.hand.is_blackjack and self.table.rules.dealer_peeks_for_blackjack:
+            self.dealer.hand.reveal()
+            action = 'Reveal'
         elif not self.bettor.done:
             play = self.bettor.play()
             action = f'Bettor {play}'
@@ -149,11 +144,7 @@ class Deal:
         return action
 
     def save(self):
-        os.makedirs(self.cache, exist_ok=True)
-        fpath = f'{self.cache}/{self.fname}'
-        # if os.path.exists(fpath):
-        #     return
-        with open(fpath, 'w') as fp:
+        with open(self.fpath, 'w') as fp:
             """Data to save:
                 Card sequence
                 Deal history
@@ -170,22 +161,26 @@ class Deal:
                 net = self.bettor.net
             else:
                 pdf = self.shoe.card_pdf()
-            options = self.next_player.hand.options()
-            opt_pdfs = {}
-            for option in options:
-                if self.next_hand:
-                    next_hands = self.next_hand.next_states(option)
-                    next_states = {}
-                    for h, prob in next_hands.items():
-                        if to_play.startswith('Dealer'):
-                            next_state = self.state(dealer_hand=h)
-                        else:
-                            # FIXME: This won't work with multiple (split) bettor hands in play
-                            next_state = self.state(bettor_hands=[h])
-                        next_states[next_state] = prob
-                    opt_pdfs[option] = next_states
-                else:
-                    opt_pdfs[option] = ''
+            if self.next_player is None:
+                to_play = 'Terminal'
+                opt_pdfs = 'Terminal'
+            else:
+                options = self.next_player.hand.options()
+                opt_pdfs = {}
+                for option in options:
+                    if self.next_hand:
+                        next_hands = self.next_hand.next_states(option)
+                        next_states = {}
+                        for h, prob in next_hands.items():
+                            if to_play.startswith('Dealer'):
+                                next_state = self.state(dealer_hand=h)
+                            else:
+                                # FIXME: This won't work with multiple (split) bettor hands in play
+                                next_state = self.state(bettor_hands=[h])
+                            next_states[next_state] = prob
+                        opt_pdfs[option] = next_states
+                    else:
+                        opt_pdfs[option] = ''
 
             data = {
                 'Cards': self.cards,

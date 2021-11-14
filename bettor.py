@@ -13,9 +13,8 @@ from strategy import Strategy
 
 
 class Bettor(Player):
-    def __init__(self, table):
-        super().__init__(table)
-        self.strategy = Strategy()
+    def __init__(self, table, strategy_name):
+        super().__init__(table, strategy_name)
 
     def __str__(self):
         return '_'.join([str(h) for h in self.hands])

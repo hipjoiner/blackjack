@@ -1,75 +1,69 @@
 """
-A complete player strategy must answer 4 questions for any hand and dealer up card:
+Complete player strategy answers these questions in order:
     Should I surrender?
     Should I split?
     Should I double?
     Should I hit?
 """
+import json
+
+from config import cache
 
 
 class Strategy:
-    """Below is basic (non-counting) optimal strategy.
-        https://www.blackjackapprenticeship.com/blackjack-strategy-charts/
-    """
+    def __init__(self, name):
+        self.name = name
+        with open(self.fpath, 'r') as fp:
+            self.spec = json.load(fp)
+
+    @property
+    def fpath(self):
+        return f'{cache}/strategies/{self.name}.json'
+
     @staticmethod
-    def surrender(hand, dlr_up):
-        if hand.total == 16 and dlr_up in ['9', 'T', 'A']:
-            return True
-        if hand.total == 15 and dlr_up == 'T':
-            return True
+    def case_check(cases, key, dlr_up):
+        if key in cases:
+            if type(cases[key]) == bool:
+                return cases[key]
+            if dlr_up in cases[key]:
+                return True
         return False
 
-    @staticmethod
-    def split(hand, dlr_up):
-        lookup = {
-            'AA': lambda d: True,
-            'TT': lambda d: False,
-            '99': lambda d: d in ['2', '3', '4', '5', '6', '8', '9'],
-            '88': lambda d: True,
-            '77': lambda d: d in ['2', '3', '4', '5', '6', '7'],
-            '66': lambda d: d in ['2', '3', '4', '5', '6'],
-            '55': lambda d: False,
-            '44': lambda d: d in ['5', '6'],
-            '33': lambda d: d in ['2', '3', '4', '5', '6', '7'],
-            '22': lambda d: d in ['2', '3', '4', '5', '6', '7'],
-        }
-        return lookup[hand.cards](dlr_up)
+    def play(self, hand, dlr_up):
+        if self.surrender(hand, dlr_up):
+            return 'surrender'
+        if self.split(hand, dlr_up):
+            return 'split'
+        if self.double(hand, dlr_up):
+            return 'double'
+        if self.hit(hand, dlr_up):
+            return 'hit'
+        return 'stand'
 
-    @staticmethod
-    def double(hand, dlr_up):
+    def surrender(self, hand, dlr_up):
+        cases = self.spec['surrender']
+        key = str(hand.total)
+        return self.case_check(cases, key, dlr_up)
+
+    def split(self, hand, dlr_up):
+        cases = self.spec['split']
+        key = hand.cards
+        return self.case_check(cases, key, dlr_up)
+
+    def double(self, hand, dlr_up):
         if hand.soft:
-            lookup = {
-                19: lambda d: d in ['6'],
-                18: lambda d: d in ['2', '3', '4', '5', '6'],
-                17: lambda d: d in ['3', '4', '5', '6'],
-                16: lambda d: d in ['4', '5', '6'],
-                15: lambda d: d in ['4', '5', '6'],
-                14: lambda d: d in ['5', '6'],
-                13: lambda d: d in ['5', '6'],
-            }
+            hand_type = 'soft'
         else:
-            lookup = {
-                11: lambda d: True,
-                10: lambda d: d in ['2', '3', '4', '5', '6', '7', '8', '9'],
-                9: lambda d: d in ['3', '4', '5', '6'],
-            }
-        return lookup.get(hand.total, lambda d: False)(dlr_up)
+            hand_type = 'hard'
+        cases = self.spec['double'][hand_type]
+        key = str(hand.total)
+        return self.case_check(cases, key, dlr_up)
 
-    @staticmethod
-    def hit(hand, dlr_up):
+    def hit(self, hand, dlr_up):
         if hand.soft:
-            if hand.total == 18 and dlr_up in ['9', 'T', 'A']:
-                return True
-            return hand.total <= 17
-        if hand.total >= 17:
-            return False
-        if hand.total <= 11:
-            return True
-        lookup = {
-            16: lambda d: d in ['7', '8', '9', 'T', 'A'],
-            15: lambda d: d in ['7', '8', '9', 'T', 'A'],
-            14: lambda d: d in ['7', '8', '9', 'T', 'A'],
-            13: lambda d: d in ['7', '8', '9', 'T', 'A'],
-            12: lambda d: d in ['2', '3', '7', '8', '9', 'T', 'A'],
-        }
-        return lookup.get(hand.total, lambda d: False)(dlr_up)
+            hand_type = 'soft'
+        else:
+            hand_type = 'hard'
+        cases = self.spec['hit'][hand_type]
+        key = str(hand.total)
+        return self.case_check(cases, key, dlr_up)

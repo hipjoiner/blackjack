@@ -1,20 +1,9 @@
 """
-Parameters defining a complete table configuration:
-    Rules
-        Table
-            Blackjack pays:                 3-2, 7-5, 6-5, 1-1
-            Shoe decks:                     1-8
-        Dealer
-            Dealer peeks for blackjack:     True/False
-            Dealer hits soft 17:            True/False
-        Player
-            Doubling:                       any 2 cards, 9-11, 10-11, not allowed
-            Split 2-10s:                    3 times, 2 times, 1 time, not allowed
-            Split aces:                     3 times, 2 times, 1 time, not allowed
-            Draw to split aces:             1 only, any
-            Double after split:             True/False
-            Surrender:                      any, any except ace, none
 """
+import json
+
+from config import cache
+from rules import Rules
 from shoe import Shoe
 from dealer import Dealer
 from bettor import Bettor
@@ -22,18 +11,29 @@ from deal import Deal
 
 
 class Table:
-    def __init__(self, rules):
-        self.rules = rules
-        self.shoe = Shoe(rules.decks)
-        self.bettor = None
-        self.dealer = Dealer(self)
-        self.bettor = Bettor(self)
+    def __init__(self, name):
+        self.name = name
+        with open(self.fpath, 'r') as fp:
+            self.spec = json.load(fp)
+
+        self.rules = Rules(self.spec['rules'])
+        self.shoe = Shoe(self.decks)
+        self.dealer = Dealer(self, self.spec['dealer'])
+        self.bettor = Bettor(self, self.spec['bettor'])
         self.deal = Deal(self)
 
     def __str__(self):
         if self.deal is None:
             return 'Empty table'
         return str(self.deal)
+
+    @property
+    def decks(self):
+        return self.spec['decks']
+
+    @property
+    def fpath(self):
+        return f'{cache}/tables/{self.name}.json'
 
     def clear(self):
         self.deal.clear()

@@ -6,14 +6,13 @@ TO DO:
     Arrange to write terminal state out to file somewhere
 
 """
-from rules import Rules
+import sys
+
 from table import Table
 
 
 def main(hands):
-    r = Rules(blackjack_pays=1.5)
-    t = Table(rules=r)
-    print(f'Rules: {t.rules}')
+    t = Table('Table1')
     for h in range(hands):
         t.clear()
         print(f'\nHand #{h + 1}:')
@@ -21,5 +20,6 @@ def main(hands):
 
 
 if __name__ == '__main__':
+    print(f'Argv:\n{sys.argv}')
     deals = 1
     main(deals)

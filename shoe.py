@@ -1,23 +1,23 @@
-"""
-Parameters defining a complete shoe configuration:
-    Decks: 1-8
-"""
 import random
-from rules import shoe_decks
 
 
 class Shoe:
     card_chars = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T']
 
-    def __init__(self, decks=8):
+    def __init__(self, decks):
         self.decks = decks
         self.cards = self.decks * 52
         self.cards_drawn = None
         self.cards_left = None
+        self.deal_sequence = ''
         self.shuffle()
 
     def __str__(self):
-        return shoe_decks[self.decks]
+        return self.name
+
+    @property
+    def name(self):
+        return f'{self.decks}-deck shoe'
 
     def card(self, rank):
         """Return character representation of card, given numerical rank"""
@@ -64,11 +64,9 @@ class Shoe:
             raise ValueError(f'Trying to draw a {rank}, but there are none left')
         self.cards_left[rank] -= 1
         self.cards_drawn[rank] += 1
-        return self.card(rank)
-
-    def draws(self):
-        """Return an array of probabilities for all card ranks"""
-        pass
+        dealt = self.card(rank)
+        self.deal_sequence = f'{self.deal_sequence}{dealt}'
+        return dealt
 
     def shuffle(self):
         self.cards_left = [4 * self.decks] * 9 + [4 * self.decks * 4]
