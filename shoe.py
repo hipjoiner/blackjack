@@ -36,7 +36,7 @@ class Shoe:
             'preset': self.preset,
             'dealt': self.dealt,
             'pdf': self.pdf,
-            'cards_left': self.cards_left,
+            # 'cards_left': self.cards_left,
         }
 
     def get_card(self):

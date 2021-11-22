@@ -83,7 +83,7 @@ class Rules:
             return False
         if hand.splits > 0 and not self.double_after_split_allowed:
             return False
-        if hand.splits > 0 and hand.up_card == 'A' and self.split_aces_draw_cards == 1:
+        if hand.splits > 0 and hand.cards[0] == 'A' and self.split_aces_draw_cards == 1:
             return False
         if self.double_allowed == 0:      # Double any 2
             return True
@@ -94,4 +94,8 @@ class Rules:
         return False
 
     def can_hit(self, hand):
+        if hand.is_doubled:
+            return False
+        if hand.splits > 0 and hand.cards[0] == 'A' and self.split_aces_draw_cards == 1:
+            return False
         return hand.total < 21

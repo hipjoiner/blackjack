@@ -14,8 +14,8 @@ class Table:
             self.spec = json.load(fp)
         self.rules = Rules(self.spec['rules'])
         self.shoe = Shoe(self.decks, preset=preset)
-        self.dealer = Player(self, 'Dealer', self.spec['dealer'])
-        self.bettor = Player(self, 'Bettor', self.spec['bettor'])
+        self.dealer = Player(self, self.spec['dealer'], is_bettor=False)
+        self.bettor = Player(self, self.spec['bettor'], is_bettor=True)
 
     @property
     def decks(self):
@@ -27,4 +27,9 @@ class Table:
 
     @property
     def state(self):
-        return self.spec
+        return {
+            'rules': self.spec['rules'],
+            'decks': self.decks,
+            'dealer_strategy': self.spec['dealer'],
+            'bettor_strategy': self.spec['bettor'],
+        }

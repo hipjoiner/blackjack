@@ -1,9 +1,21 @@
+from datetime import datetime, timedelta
 import json
 import os
 from pprint import pprint
 
 from config import data
 from table import Table
+
+
+def log(txt):
+    now = datetime.now()
+    if not hasattr(log, 'next'):
+        log.next = now
+        log.count = 0
+    log.count += 1
+    if datetime.now() >= log.next:
+        print(f'{now.strftime("%Y-%m-%d %H:%M:%S")} ({log.count}) {txt}')
+        log.next = now + timedelta(seconds=5)
 
 
 class Deal:
@@ -16,6 +28,9 @@ class Deal:
     def __init__(self, table_name, cards=''):
         self.table = Table(table_name, preset=cards)
         self.cards = cards
+        log(f'Instantiating {self.name}...')
+        while len(self.table.shoe.dealt) < len(self.table.shoe.preset):
+            self.deal_card()
 
     def deal_card(self):
         player = self.next_player
@@ -24,13 +39,39 @@ class Deal:
         player.add_card(self.table.shoe.get_card())
 
     @property
+    def expected_value(self):
+        if self.net_value is not None:
+            ev = self.net_value
+            nodes = 1
+        else:
+            # Recursive
+            ev = 0.0
+            nodes = 0
+            for name, state_data in self.next_states.items():
+                istate = state_data['state']
+                iev, inodes = istate.expected_value
+                ev += iev * state_data['prob']
+                nodes += inodes
+                if nodes >= 10:
+                    istate.save()
+        return ev, nodes
+
+    @property
     def fpath(self):
         os.makedirs(f'{data}/deals/{self.table.name}', exist_ok=True)
         return f'{data}/deals/{self.table.name}/{self.name}.json'
 
     @property
+    def is_done(self):
+        return self.next_player is None
+
+    @property
     def name(self):
         return f'{self.table.name}-{self.cards}'
+
+    @property
+    def net_value(self):
+        return self.table.bettor.net_value
 
     @property
     def next_player(self):
@@ -50,12 +91,50 @@ class Deal:
         return None
 
     @property
+    def next_states(self):
+        if self.is_done:
+            return None
+        states = {}
+        for card, prob in self.table.shoe.pdf.items():
+            name = f'{self.name}{card}'
+            state = Deal(self.table.name, cards=f'{self.cards}{card}')
+            states[name] = {
+                'prob': prob,
+                'state': state,
+            }
+        return states
+
+    @property
+    def next_state_info(self):
+        state_info = {}
+        states = self.next_states
+        if states:
+            for name, data in states.items():
+                ev, nodes = data['state'].expected_value
+                state_info[name] = {
+                    'probability': data['prob'],
+                    'is_done': data['state'].is_done,
+                    'net_value': data['state'].net_value,
+                    'expected_value': ev,
+                    'nodes': nodes
+                }
+        return state_info
+
+    @property
     def state(self):
+        ev, nodes = self.expected_value
         return {
-            'name': self.name,
+            'deal': {
+                'name': self.name,
+                'is_done': self.is_done,
+                'net_value': self.net_value,
+                'expected_value': ev,
+                'nodes': nodes,
+                'next_states': self.next_state_info,
+            },
             'table': self.table.state,
             'shoe': self.table.shoe.state,
-            'rules': self.table.rules.state,
+            # 'rules': self.table.rules.state,
             'dealer': self.table.dealer.state,
             'bettor': self.table.bettor.state,
         }
@@ -66,10 +145,10 @@ class Deal:
 
 
 if __name__ == '__main__':
-    d = Deal('Table1', '878A')
-    while len(d.table.shoe.dealt) < len(d.table.shoe.preset):
-        d.deal_card()
-    print('')
-    pprint(d.state)
+    d = Deal('Table1', '878A3T6')
+    # d = Deal('Table1', '878A3T')
+    # d = Deal('Table1', '878A3T822AAAA283AA2922AA29')
+    # print('')
+    # pprint(d.state)
     d.save()
-
+    # x = d.expected_value
