@@ -10,6 +10,15 @@ import json
 from config import cache
 
 
+def case_check(cases, key, dealer_up):
+    if key in cases:
+        if type(cases[key]) == bool:
+            return cases[key]
+        if dealer_up in cases[key]:
+            return True
+    return False
+
+
 class Strategy:
     def __init__(self, name):
         self.name = name
@@ -20,50 +29,41 @@ class Strategy:
     def fpath(self):
         return f'{cache}/strategies/{self.name}.json'
 
-    @staticmethod
-    def case_check(cases, key, dlr_up):
-        if key in cases:
-            if type(cases[key]) == bool:
-                return cases[key]
-            if dlr_up in cases[key]:
-                return True
-        return False
-
-    def play(self, hand, dlr_up):
-        if self.surrender(hand, dlr_up):
+    def play(self, hand, dealer_up):
+        if self.surrender(hand, dealer_up):
             return 'surrender'
-        if self.split(hand, dlr_up):
+        if self.split(hand, dealer_up):
             return 'split'
-        if self.double(hand, dlr_up):
+        if self.double(hand, dealer_up):
             return 'double'
-        if self.hit(hand, dlr_up):
+        if self.hit(hand, dealer_up):
             return 'hit'
         return 'stand'
 
-    def surrender(self, hand, dlr_up):
+    def surrender(self, hand, dealer_up):
         cases = self.spec['surrender']
         key = str(hand.total)
-        return self.case_check(cases, key, dlr_up)
+        return case_check(cases, key, dealer_up)
 
-    def split(self, hand, dlr_up):
+    def split(self, hand, dealer_up):
         cases = self.spec['split']
         key = hand.cards
-        return self.case_check(cases, key, dlr_up)
+        return case_check(cases, key, dealer_up)
 
-    def double(self, hand, dlr_up):
-        if hand.soft:
+    def double(self, hand, dealer_up):
+        if hand.is_soft:
             hand_type = 'soft'
         else:
             hand_type = 'hard'
         cases = self.spec['double'][hand_type]
         key = str(hand.total)
-        return self.case_check(cases, key, dlr_up)
+        return case_check(cases, key, dealer_up)
 
-    def hit(self, hand, dlr_up):
-        if hand.soft:
+    def hit(self, hand, dealer_up):
+        if hand.is_soft:
             hand_type = 'soft'
         else:
             hand_type = 'hard'
         cases = self.spec['hit'][hand_type]
         key = str(hand.total)
-        return self.case_check(cases, key, dlr_up)
+        return case_check(cases, key, dealer_up)

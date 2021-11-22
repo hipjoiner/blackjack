@@ -1,1 +1,2 @@
-cache = 'C:/Users/John/blackjack'
+cache = 'C:/Users/John/OneDrive/blackjack'
+data = 'C:/Users/John/blackjack'

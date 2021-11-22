@@ -1,73 +1,54 @@
-import random
+from pprint import pprint
 
 
 class Shoe:
-    card_chars = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T']
+    ranks = 'TA23456789'
 
-    def __init__(self, decks):
+    def __init__(self, decks, preset=''):
         self.decks = decks
-        self.cards = self.decks * 52
-        self.cards_drawn = None
-        self.cards_left = None
-        self.deal_sequence = ''
-        self.shuffle()
+        self.preset = preset
+        self.dealt = ''
 
     def __str__(self):
-        return self.name
-
-    @property
-    def name(self):
         return f'{self.decks}-deck shoe'
 
-    def card(self, rank):
-        """Return character representation of card, given numerical rank"""
-        return self.card_chars[rank]
-
-    def card_pdf(self):
-        """Return dict by card character giving draw probability from pdf"""
-        return dict(zip(self.card_chars, self.pdf()))
-
-    def cdf(self):
-        result = [0.0] * 10
-        c = 0
-        for rank in range(10):
-            c = c + self.pdf()[rank]
-            result[rank] = c
+    @property
+    def cards_left(self):
+        result = {}
+        for rank in self.ranks:
+            if rank == 'T':
+                rank_tot = self.decks * 4 * 4
+            else:
+                rank_tot = self.decks * 4
+            rank_dealt = self.dealt.count(rank)
+            result[rank] = rank_tot - rank_dealt
         return result
 
+    @property
     def pdf(self):
-        """Array of probabilities of draw, ordered by rank"""
-        tot_cards_left = sum(self.cards_left)
-        return [self.cards_left[rank] / tot_cards_left for rank in range(10)]
+        tot_cards_left = self.decks * 52 - len(self.dealt)
+        return dict(zip(self.ranks, [self.cards_left[rank] / tot_cards_left for rank in self.ranks]))
 
-    def choose_random(self):
-        """Choose a random card from what's left in the shoe"""
-        cdf = self.cdf()
-        r = random.random()
-        for rank in range(10):
-            if r < cdf[rank]:
-                return rank
-        raise ValueError(f'Choose random failed: seed {r}, cdf {cdf}')
+    @property
+    def state(self):
+        return {
+            'decks': self.decks,
+            'preset': self.preset,
+            'dealt': self.dealt,
+            'pdf': self.pdf,
+            'cards_left': self.cards_left,
+        }
 
-    def depleted(self):
-        """For now, we'll say 10% of shoe remaining is depleted; time to reshuffle"""
-        return sum(self.cards_left) < self.cards / 10
+    def get_card(self):
+        num_dealt = len(self.dealt)
+        card = self.preset[num_dealt]
+        self.dealt = f'{self.dealt}{card}'
+        return card
 
-    def draw(self, rank=None):
-        """Return a single card; update shoe state.
-        If rank specified, return that specific rank (unless there are none; then error)
-        If rank unspecified, return a card at random based on shoe state.
-        """
-        if rank is None:
-            rank = self.choose_random()
-        if self.cards_left[rank] == 0:
-            raise ValueError(f'Trying to draw a {rank}, but there are none left')
-        self.cards_left[rank] -= 1
-        self.cards_drawn[rank] += 1
-        dealt = self.card(rank)
-        self.deal_sequence = f'{self.deal_sequence}{dealt}'
-        return dealt
 
-    def shuffle(self):
-        self.cards_left = [4 * self.decks] * 9 + [4 * self.decks * 4]
-        self.cards_drawn = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+if __name__ == '__main__':
+    s = Shoe(8, 'T5A')
+    print(s)
+    s.get_card()
+    s.get_card()
+    pprint(s.state())
