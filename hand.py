@@ -35,7 +35,10 @@ class Hand:
 
     @property
     def dealer_up(self):
-        return self.player.table.dealer.cards[0]
+        cards = self.player.table.dealer.cards
+        if len(cards) == 0:
+            return None
+        return cards[0]
 
     @property
     def hard_total(self):
@@ -51,7 +54,16 @@ class Hand:
 
     @property
     def is_done(self):
+        if self.num_cards < 2:
+            return False
+        if self.player.opponent.is_final:
+            return True
         return self.next_play is None
+
+    @property
+    def is_final(self):
+        """Final means opponent should not bother taking any cards because outcome is already knowable"""
+        return self.is_blackjack or self.is_surrendered or self.is_busted
 
     @property
     def is_paired(self):
@@ -109,26 +121,6 @@ class Hand:
     @property
     def num_cards(self):
         return len(self.cards)
-
-    @property
-    def result(self):
-        if self.is_blackjack:
-            if self.dealer.hand.is_blackjack:
-                return 'Push'
-            return 'Won'
-        if self.dealer.hand.is_blackjack:
-            return 'Lost'
-        if self.surrendered:
-            return 'Lost'
-        if self.total > 21:
-            return 'Lost'
-        if self.dealer.total > 21:
-            return 'Won'
-        if self.total > self.dealer.total:
-            return 'Won'
-        if self.total < self.dealer.total:
-            return 'Lost'
-        return 'Push'
 
     @property
     def rules(self):

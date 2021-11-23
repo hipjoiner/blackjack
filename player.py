@@ -10,6 +10,12 @@ class Player:
         self.hands = [Hand(self)]
         self.cards = ''
 
+    def add_card(self, card):
+        if self.next_hand is None:
+            raise ValueError(f'Failed to deal card: {self.table.name}-{self.table.shoe.preset}')
+        self.cards = f'{self.cards}{card}'
+        self.next_hand.add_card(card)
+
     @property
     def is_dealer(self):
         return not self.is_bettor
@@ -17,6 +23,15 @@ class Player:
     @property
     def is_done(self):
         return self.next_hand is None
+
+    @property
+    def is_final(self):
+        if len(self.hands) == 0:
+            return False
+        for hand in self.hands:
+            if not hand.is_final:
+                return False
+        return True
 
     @property
     def net_value(self):
@@ -38,6 +53,12 @@ class Player:
         return None
 
     @property
+    def opponent(self):
+        if self.is_dealer:
+            return self.table.bettor
+        return self.table.dealer
+
+    @property
     def state(self):
         if self.is_dealer:
             return {
@@ -52,9 +73,3 @@ class Player:
             'net_value': self.net_value,
             'hands': [hand.state for hand in self.hands],
         }
-
-    def add_card(self, card):
-        if self.next_hand is None:
-            raise ValueError(f'Tried to deal card to player but no hand wants one')
-        self.cards = f'{self.cards}{card}'
-        self.next_hand.add_card(card)
