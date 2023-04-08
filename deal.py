@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 import json
 import os
+import sys
 
 from config import data, log
 from table import Table
@@ -77,13 +78,13 @@ class Deal:
     @property
     def next_player(self):
         """Return reference to next player to play, or None if all players are done"""
-        if len(self.table.bettor.hands[0].cards) == 0:
+        if len(self.table.bettor.hand.cards) == 0:
             return self.table.bettor
-        if len(self.table.dealer.hands[0].cards) == 0:
+        if len(self.table.dealer.hand.cards) == 0:
             return self.table.dealer
-        if len(self.table.bettor.hands[0].cards) == 1:
+        if len(self.table.bettor.hand.cards) == 1:
             return self.table.bettor
-        if len(self.table.dealer.hands[0].cards) == 1:
+        if len(self.table.dealer.hand.cards) == 1:
             return self.table.dealer
         if not self.table.bettor.is_done:
             return self.table.bettor
@@ -163,5 +164,12 @@ if __name__ == '__main__':
     # d = Deal('Table1', '878A3T822AAAA283AA2922AA29')
     # d = Deal('Table1', 'TT5T')                # Bug fix: bettor's 15 surrenders to T regardless of future cards
     # d = Deal('Table1', 'TA2AAAAAAAA35AAA3')   # OK
-    d = Deal('Table1', '')
+    # d = Deal('Table1', '')
+    t = 'Table1'
+    c = ''
+    if len(sys.argv) > 1:
+        t = sys.argv[1]
+        if len(sys.argv) > 2:
+            c = sys.argv[2]
+    d = Deal(t, c)
     d.save()

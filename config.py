@@ -1,7 +1,7 @@
 from datetime import datetime
 
 
-cache = 'C:/Users/John/OneDrive/blackjack'
+cache = 'C:/Users/John/OneDrive/Documents/blackjack'
 data = 'C:/Users/John/blackjack'
 
 
