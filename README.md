@@ -22,7 +22,7 @@ Are no more cards needed?
 If true, compute EV.
 If not, construct subsequent states.
 
-All actions
+Actions
     Insurance   I
     Surrender   S
     Split       V
@@ -30,7 +30,9 @@ All actions
     Hit         H
     Stand       X
 
-Table state representation
+
+------------------------------------------------------------------------------------------------------------------------
+Table state
     Decks                           6D/8D/1D/2D/4D
     Dealer hit/stand soft 17        H17/S17
     Double after split allowed      DAS/NDS
@@ -38,31 +40,49 @@ Table state representation
     Split hands                     S0/S1/S2/S3
     Resplit Aces allowed            RSA/NRSA
     Surrender allowed               S/NS
-e.g.,
+
     T 6D-S17-DAS-D2-S3-RSA-S
 
+
+------------------------------------------------------------------------------------------------------------------------
 Player state representation
+                                    2-3-4-5-6-7-8-9-T-A
     Cards                           0-0-0-0-0-0-0-0-0-0     Ten-value array showing number of cards of each rank
-    Insurance                       I/<empty>
-    Surrender                       S/<empty>
-    Split                           V<R>-<n>of<N>/<empty>    Rank R - hand n - total splits N
-    Double                          D/<empty>
-e.g.,
-    P ^2-3-4-5-6-7-8-9-T-A
-    P ^1-0-0-0-0-1-0-1-0-0
+    Insurance taken                 I                       Insurance, surrender and split modify the overall round
+    Surrendered                     R
+    Split                           Sn
+
+    Double                          D                       Double modifies each individual (possibly split) hand
+
+
+    P D^1-0-0-0-0-1-0-1-0-0
+
 Player dealt 9 and 2, doubled, subsequently dealt a 7
 OR
 Player dealt 7 and 2, doubled, subsequently dealt a 9
 
 Split representation
-    Player-<hand-1-state>[|<hand-2-state>]...
-    States sorted alphabetically
+    P <hand-1-state> [<hand-2-state>]...
+    Sort hand states alphabetically to reduce number of permutations
 
+    P S2 D^1-0-0-0-0-1-0-1-0-0 ^1-0-0-1-0-0-0-0-1-0
+
+Dealt pair of 2s; split. First hand dealt 9 (or 7), doubled, got 7 (or 9). Second hand dealt 5 and T (order unknown).
+
+
+------------------------------------------------------------------------------------------------------------------------
 Dealer state representation
     Up card                         2/3/4/5/6/7/8/9/T/A
     Cards                           0-0-0-0-0-0-0-0-0-0     Ten-value array showing number of cards of each rank
-e.g.,
-    D 4^0-0-1-0-0-0-1-0-0-0
+    Insurance offered               I
 
+    D 4^1-0-0-0-0-0-1-0-0-0
+    D I A^0-0-0-0-0-0-0-0-1-1
+
+
+------------------------------------------------------------------------------------------------------------------------
 Full state representation
-    <table state>-<dealer state>-<player state>
+    <table state> # <dealer state> # <player state>
+
+    T 6D-S17-DAS-D2-S3-RSA-S # D 4^1-0-0-0-0-0-1-0-0-0 # P S2 D^1-0-0-0-0-1-0-1-0-0 ^1-0-0-1-0-0-0-0-1-0
+
