@@ -1,16 +1,12 @@
-from pprint import pprint
+from hand import Hand
 
 
-class Shoe:
-    ranks = 'TA23456789'
-
-    def __init__(self, decks, preset=''):
+class Shoe(Hand):
+    def __init__(self, decks):
+        super().__init__()
         self.decks = decks
         self.preset = preset
         self.dealt = ''
-
-    def __str__(self):
-        return f'{self.decks}-deck shoe'
 
     @property
     def cards_left(self):
