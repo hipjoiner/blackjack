@@ -34,6 +34,22 @@ class Hand:
         self.counts[self.indexes[card]] += 1
 
     @property
+    def cards(self):
+        return dict(zip(self.symbols, self.counts))
+
+    @property
+    def data(self):
+        return {
+            'cards': self.cards,
+            # 'counts': self.counts,
+            'total': self.total,
+            'is_blackjack': self.is_blackjack,
+            'is_soft': self.is_soft,
+            'is_busted': self.is_busted,
+            'pdf': self.pdf,
+        }
+
+    @property
     def hard_total(self):
         return sum([self.counts[i] * self.values[i] for i in self.indexes.values()])
 
@@ -59,18 +75,8 @@ class Hand:
 
     @property
     def pdf(self):
-        return dict(zip(self.symbols, [self.counts[i] / self.num_cards for i in self.indexes.values()]))
-
-    @property
-    def state(self):
-        return {
-            'counts': self.counts,
-            'total': self.total,
-            'is_blackjack': self.is_blackjack,
-            'is_soft': self.is_soft,
-            'is_busted': self.is_busted,
-            'pdf': self.pdf,
-        }
+        probs = [self.counts[i] / self.num_cards if self.num_cards != 0 else 0 for i in self.indexes.values()]
+        return dict(zip(self.symbols, probs))
 
     @property
     def total(self):
@@ -82,4 +88,4 @@ class Hand:
 if __name__ == '__main__':
     h = Hand('AT')
     print(f'Hand:\n{h}')
-    print(f'Hand state:\n{h.state}')
+    print(f'Hand data:\n{h.data}')

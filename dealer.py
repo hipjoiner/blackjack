@@ -7,12 +7,20 @@ class Dealer:
         self.hand = Hand()
 
     def __repr__(self):
-        return f'D {self.hand}'
+        return self.name
 
     @property
-    def state(self):
+    def data(self):
+        hd = self.hand.data
+        del hd['pdf']
         return {
+            'name': self.name,
+            'hand': hd,
         }
+
+    @property
+    def name(self):
+        return f'D {self.hand}'
 
 
 if __name__ == '__main__':

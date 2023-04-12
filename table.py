@@ -1,10 +1,9 @@
-from config import cache
+from config import home_dir
 
 
 class Table:
     """
     Assume Blackjack always pays 3:2
-
     Decks                           6D/8D/1D/2D/4D
     Dealer hit/stand soft 17        H17/S17
     Double after split allowed      DAS/NDS
@@ -15,6 +14,28 @@ class Table:
 
     T 6D-S17-DAS-D2-S3-RSA-S
     """
+    options = {
+        '1D',       # 1 deck
+        '2D',       # 2 decks
+        '4D',       # 4 decks
+        '6D',       # 6 decks
+        '8D',       # 8 decks
+        'DAS',
+        'D2',
+        'D9',
+        'D10',
+        'H17',
+        'LS',
+        'NDS',
+        'NRSA',
+        'NS',
+        'RSA',
+        'S0',
+        'S1',
+        'S17',
+        'S2',
+        'S3',
+    }
 
     def __init__(self, decks=6, soft_17='S17', das='DAS', double_any='D2', splits='S3', rsa='RSA', surrender='S'):
         self.decks = decks
@@ -25,18 +46,13 @@ class Table:
         self.rsa = rsa
         self.surrender = surrender
 
-    @property
-    def fpath(self):
-        return f'{cache}/tables/{self.spec}.json'
+    def __repr__(self):
+        return self.name
 
     @property
-    def spec(self):
-        return f'T {self.decks}D-{self.soft_17}-{self.das}-{self.double_any}-{self.splits}-{self.rsa}-{self.surrender}'
-
-    @property
-    def state(self):
+    def data(self):
         return {
-            'spec': self.spec,
+            'spec': self.name,
             'decks': self.decks,
             'soft_17': self.soft_17,
             'double_after_split': self.das,
@@ -46,7 +62,15 @@ class Table:
             'late_surrender': self.surrender,
         }
 
+    @property
+    def fpath(self):
+        return f'{home_dir}/tables/{self.name}.json'
+
+    @property
+    def name(self):
+        return f'T {self.decks}D-{self.soft_17}-{self.das}-{self.double_any}-{self.splits}-{self.rsa}-{self.surrender}'
+
 
 if __name__ == '__main__':
     t = Table()
-    print(t.state)
+    print(t.data)
