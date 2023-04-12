@@ -7,8 +7,8 @@ Hand play sequence
 2. Dealer card up
 3. Bettor card 2
 4. Dealer card down
-5. Bettor early surrender; if yes, hand is over
-6. Bettor check for blackjack; if yes, hand is over
+5. Insurance offer
+6. Insurance acceptance
 7. Dealer check for blackjack; if yes, hand is over
 8. Bettor surrender; if yes, hand is over
 9. Bettor play option

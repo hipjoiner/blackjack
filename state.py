@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from functools import lru_cache
 import json
 import os
@@ -8,7 +7,7 @@ from config import data, log
 from table import Table
 
 
-class Deal:
+class State:
     """
     State engine, and focus for computation of expected value.
     The Deal will start with a single bettor hand, but the bettor may split into two or more hands.
@@ -16,18 +15,10 @@ class Deal:
         but the deal EV is the one of primary interest to us.
     """
     node_threshold = 10000
-    next_inst_msg = datetime.now()
-    inst_msg_interval = timedelta(seconds=5)
-    inst_count = 0
 
     def __init__(self, table_name, cards=''):
         self.table = Table(table_name, preset=cards)
         self.cards = cards
-        now = datetime.now()
-        Deal.inst_count += 1
-        if now >= Deal.next_inst_msg:
-            log(f'Instantiating {self.name} ({Deal.inst_count})...')
-            Deal.next_inst_msg = now + Deal.inst_msg_interval
         while len(self.table.shoe.dealt) < len(self.table.shoe.preset):
             self.deal_card()
         self.cache = self.load()
@@ -111,7 +102,7 @@ class Deal:
                 'ev': state.expected_value,
                 'nodes': state.nodes,
             }
-            if state.nodes > Deal.node_threshold and state.cache is None:
+            if state.nodes > State.node_threshold and state.cache is None:
                 log(f'Writing {state.name} ({state.nodes} nodes) to cache...')
                 state.save()
         return states
@@ -121,7 +112,7 @@ class Deal:
     def next_states_recursive(self):
         states = {}
         for card, prob in self.table.shoe.pdf.items():
-            state = Deal(self.table.name, cards=f'{self.cards}{card}')
+            state = State(self.table.name, cards=f'{self.cards}{card}')
             states[state.name] = state
         return states
 
@@ -171,5 +162,5 @@ if __name__ == '__main__':
         t = sys.argv[1]
         if len(sys.argv) > 2:
             c = sys.argv[2]
-    d = Deal(t, c)
+    d = State(t, c)
     d.save()
