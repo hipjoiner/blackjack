@@ -1,27 +1,16 @@
-from functools import lru_cache
-import json
-import os
-import sys
-
-from config import data, log
+from config import home_dir
 from table import Table
+from shoe import Shoe
+from dealer import Dealer
+from player import Player
 
 
 class State:
-    """
-    State engine, and focus for computation of expected value.
-    The Deal will start with a single bettor hand, but the bettor may split into two or more hands.
-    We compute expected value for each of the splits of course, since we are computing recursively,
-        but the deal EV is the one of primary interest to us.
-    """
-    node_threshold = 10000
-
-    def __init__(self, table_name, cards=''):
-        self.table = Table(table_name, preset=cards)
-        self.cards = cards
-        while len(self.table.shoe.dealt) < len(self.table.shoe.preset):
-            self.deal_card()
-        self.cache = self.load()
+    def __init__(self, table=Table(), dealer=Dealer(), player=Player()):
+        self.table = table
+        self.shoe = Shoe(self)
+        self.dealer = dealer
+        self.player = player
 
     def deal_card(self):
         player = self.next_player
@@ -30,8 +19,6 @@ class State:
         card = self.table.shoe.get_card()
         player.add_card(card)
 
-    @property
-    @lru_cache()
     def expected_value(self):
         if self.net_value is not None:
             return self.net_value
