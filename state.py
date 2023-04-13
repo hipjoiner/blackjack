@@ -9,11 +9,17 @@ from player import Player
 
 
 class State:
-    def __init__(self):
-        self.table = Table()
-        self.shoe = Shoe(6)
-        self.dealer = Dealer(self.table)
-        self.player = Player(self.table)
+    def __init__(self, table=None, dealer=None, player=None):
+        self.table = table
+        if self.table is None:
+            self.table = Table()
+        self.dealer = dealer
+        if self.dealer is None:
+            self.dealer = Dealer(self.table)
+        self.player = player
+        if self.player is None:
+            self.player = Player(self.table)
+        self.shoe = Shoe(self.table.decks)
 
     def __repr__(self):
         return self.name
@@ -24,10 +30,14 @@ class State:
             'name': self.name,
             'fpath': self.fpath,
             'table': self.table.data,
+            'round': {
+                'to_play': self.to_play,
+                'winner': self.winner,
+                'next_states': self.next_states,
+            },
             'shoe': self.shoe.data,
             'dealer': self.dealer.data,
             'player': self.player.data,
-            'to_play': self.to_play,
         }
 
     @property
@@ -66,6 +76,10 @@ class State:
         os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
         with open(self.fpath, 'w') as fp:
             json.dump(self.data, fp, indent=4)
+
+    @property
+    def winner(self):
+        return None
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ class Hand:
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, cards=None):
+    def __init__(self, cards=None, counts=None):
         self.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         if cards is not None:
             if type(cards) != str:
