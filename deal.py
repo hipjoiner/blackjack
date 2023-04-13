@@ -8,7 +8,7 @@ from dealer import Dealer
 from player import Player
 
 
-class State:
+class Deal:
     def __init__(self, table=None, dealer=None, player=None):
         self.table = table
         if self.table is None:
@@ -23,22 +23,6 @@ class State:
 
     def __repr__(self):
         return self.name
-
-    @property
-    def data(self):
-        return {
-            'name': self.name,
-            'fpath': self.fpath,
-            'table': self.table.data,
-            'round': {
-                'to_play': self.to_play,
-                'winner': self.winner,
-                'next_states': self.next_states,
-            },
-            'shoe': self.shoe.data,
-            'dealer': self.dealer.data,
-            'player': self.player.data,
-        }
 
     @property
     def fpath(self):
@@ -60,6 +44,27 @@ class State:
     def next_states(self):
         return None
 
+    def save(self):
+        os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
+        with open(self.fpath, 'w') as fp:
+            json.dump(self.state, fp, indent=4)
+
+    @property
+    def state(self):
+        return {
+            'name': self.name,
+            'fpath': self.fpath,
+            'table': self.table.data,
+            'round': {
+                'to_play': self.to_play,
+                'winner': self.winner,
+                'next_states': self.next_states,
+            },
+            'shoe': self.shoe.state,
+            'dealer': self.dealer.state,
+            'player': self.player.state,
+        }
+
     @property
     def to_play(self):
         if self.player.active_hand.num_cards == 0:
@@ -72,16 +77,11 @@ class State:
             return 'Dealer'
         return None
 
-    def save(self):
-        os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
-        with open(self.fpath, 'w') as fp:
-            json.dump(self.data, fp, indent=4)
-
     @property
     def winner(self):
         return None
 
 
 if __name__ == '__main__':
-    d = State()
+    d = Deal()
     d.save()

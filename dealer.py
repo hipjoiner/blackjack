@@ -10,17 +10,15 @@ class Dealer:
         return self.name
 
     @property
-    def data(self):
-        hd = self.hand.data
-        del hd['pdf']
-        return {
-            'name': self.name,
-            'hand': hd,
-        }
-
-    @property
     def name(self):
         return f'D {self.hand}'
+
+    @property
+    def state(self):
+        return {
+            'name': self.name,
+            'hand': self.hand.state,
+        }
 
 
 if __name__ == '__main__':

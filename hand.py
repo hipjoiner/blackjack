@@ -10,6 +10,7 @@
         total
         is_blackjack
         is_busted
+        is_doubled
         is_pair
         is_soft
 """
@@ -19,16 +20,13 @@ class Hand:
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, cards=None, counts=None):
-        self.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        if cards is not None:
-            if type(cards) != str:
-                raise ValueError('Cards initializer for Hand must be a string')
-            for c in cards:
-                self.add(c)
+    def __init__(self, counts=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], cards=''):
+        self.counts = counts
+        for c in cards:
+            self.add(c)
 
     def __str__(self):
-        return '-'.join([str(c) for c in self.counts])
+        return self.name
 
     def add(self, card):
         self.counts[self.indexes[card]] += 1
@@ -36,18 +34,6 @@ class Hand:
     @property
     def cards(self):
         return dict(zip(self.symbols, self.counts))
-
-    @property
-    def data(self):
-        return {
-            'cards': self.cards,
-            # 'counts': self.counts,
-            'total': self.total,
-            'is_blackjack': self.is_blackjack,
-            'is_soft': self.is_soft,
-            'is_busted': self.is_busted,
-            'pdf': self.pdf,
-        }
 
     @property
     def hard_total(self):
@@ -70,13 +56,23 @@ class Hand:
         return self.total != self.hard_total
 
     @property
+    def name(self):
+        return '-'.join([str(c) for c in self.counts])
+
+    @property
     def num_cards(self):
         return sum(self.counts)
 
     @property
-    def pdf(self):
-        probs = [self.counts[i] / self.num_cards if self.num_cards != 0 else 0 for i in self.indexes.values()]
-        return dict(zip(self.symbols, probs))
+    def state(self):
+        return {
+            'cards': self.cards,
+            # 'counts': self.counts,
+            'total': self.total,
+            'is_blackjack': self.is_blackjack,
+            'is_soft': self.is_soft,
+            'is_busted': self.is_busted,
+        }
 
     @property
     def total(self):
@@ -86,6 +82,6 @@ class Hand:
 
 
 if __name__ == '__main__':
-    h = Hand('AT')
+    h = Hand(cards='AT')
     print(f'Hand:\n{h}')
-    print(f'Hand data:\n{h.data}')
+    print(f'Hand data:\n{h.state}')
