@@ -2,24 +2,23 @@ import json
 import os
 
 from config import home_dir
-from table import Table
+from rules import Rules
 from shoe import Shoe
-from dealer import Dealer
 from player import Player
 
 
 class Deal:
-    def __init__(self, table=None, dealer=None, player=None):
-        self.table = table
-        if self.table is None:
-            self.table = Table()
+    def __init__(self, rules=None, dealer=None, player=None):
+        self.rules = rules
+        if self.rules is None:
+            self.rules = Rules()
         self.dealer = dealer
         if self.dealer is None:
-            self.dealer = Dealer(self.table)
+            self.dealer = Player(self.rules, is_dealer=True)
         self.player = player
         if self.player is None:
-            self.player = Player(self.table)
-        self.shoe = Shoe(self.table.decks)
+            self.player = Player(self.rules, is_dealer=False)
+        self.shoe = Shoe(self.rules.decks)
 
     def __repr__(self):
         return self.name
@@ -38,7 +37,7 @@ class Deal:
 
     @property
     def name(self):
-        return f'{self.table} # {self.dealer} # {self.player}'
+        return f'{self.rules} # {self.dealer} # {self.player}'
 
     @property
     def next_states(self):
@@ -54,9 +53,9 @@ class Deal:
         return {
             'name': self.name,
             'fpath': self.fpath,
-            'table': self.table.data,
+            'table': self.rules.state,
             'round': {
-                'to_play': self.to_play,
+                'next_to_play': self.next_to_play,
                 'winner': self.winner,
                 'next_states': self.next_states,
             },
@@ -66,15 +65,12 @@ class Deal:
         }
 
     @property
-    def to_play(self):
-        if self.player.active_hand.num_cards == 0:
-            return 'Player'
-        if self.dealer.hand.num_cards == 0:
-            return 'Dealer'
-        if self.player.active_hand.num_cards == 1:
-            return 'Player'
-        if self.dealer.hand.num_cards == 1:
-            return 'Dealer'
+    def next_to_play(self):
+        # Initial deal
+        for num_cards in [0, 1]:
+            for p in [self.player, self.dealer]:
+                if p.hand.num_cards == num_cards:
+                    return p
         return None
 
     @property

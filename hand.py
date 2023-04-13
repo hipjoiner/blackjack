@@ -1,8 +1,4 @@
-"""A Hand is just a collection of cards.
-    A player's hand is a Hand; dealer's hand is a Hand.
-    A deck of cards is also a Hand, as is a Shoe.
-
-    Hand is orderless. Properties:
+"""A Hand's cards are orderless. Properties:
         count of cards of each rank
         num_cards
         hard_total
@@ -13,6 +9,16 @@
         is_doubled
         is_pair
         is_soft
+        is_terminal
+
+    Possible hand actions:
+        deal (card) (excludes other options)
+        blackjack (no card) (excludes other options) (end state)
+        surrender (no card) (end state)
+        split (card)
+        double (card) (end state)
+        hit (card)
+        stand (no card) (end state)
 """
 
 class Hand:
@@ -20,7 +26,8 @@ class Hand:
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, counts=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], cards=''):
+    def __init__(self, player, counts=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], cards=''):
+        self.player = player
         self.counts = counts
         for c in cards:
             self.add(c)
@@ -48,6 +55,11 @@ class Hand:
         return self.total > 21
 
     @property
+    def is_done(self):
+        # Has hand reached a terminal state
+        return False
+
+    @property
     def is_pair(self):
         return self.num_cards == 2 and max(self.counts) == 2
 
@@ -67,7 +79,6 @@ class Hand:
     def state(self):
         return {
             'cards': self.cards,
-            # 'counts': self.counts,
             'total': self.total,
             'is_blackjack': self.is_blackjack,
             'is_soft': self.is_soft,
@@ -82,6 +93,9 @@ class Hand:
 
 
 if __name__ == '__main__':
-    h = Hand(cards='AT')
+    from player import Player
+    from rules import Rules
+    p = Player(Rules(), is_dealer=False)
+    h = Hand(p, cards='AT')
     print(f'Hand:\n{h}')
     print(f'Hand data:\n{h.state}')
