@@ -19,15 +19,15 @@ class Hand(metaclass=CachedInstance):
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), cards='', surrendered=False, doubled=False, stand=False):
-        self.player = player
+    def __init__(self, deal, player_type, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), cards='', surrendered=False, doubled=False, stand=False):
+        self.deal = deal
+        self.player_type = player_type
         self.counts = list(counts)
         for c in cards:
             self.add(c)
         self.surrendered = surrendered
         self.doubled = doubled
         self.stand = stand
-        self.index = 0
 
     def __str__(self):
         return self.name
@@ -41,22 +41,27 @@ class Hand(metaclass=CachedInstance):
 
     @property
     def can_surrender(self):
+        # FIXME
         return True
 
     @property
     def can_split(self):
+        # FIXME
         return True
 
     @property
     def can_double(self):
+        # FIXME
         return True
 
     @property
     def can_hit(self):
+        # FIXME
         return True
 
     @property
     def can_stand(self):
+        # FIXME
         return True
 
     @property
@@ -102,14 +107,16 @@ class Hand(metaclass=CachedInstance):
             s += '^S'
         return s
 
-    def new_state(self, card='', surrender=None, double=None, stand=None):
-        if surrender is None:
-            surrender = self.surrendered
-        if double is None:
-            double = self.doubled
+    def new_hand(self, counts=None, cards='', surrendered=None, doubled=None, stand=None):
+        if counts is None:
+            counts = self.counts
+        if surrendered is None:
+            surrendered = self.surrendered
+        if doubled is None:
+            doubled = self.doubled
         if stand is None:
             stand = self.stand
-        new_hand = Hand(self.player, tuple(self.counts), cards=card, surrendered=surrender, doubled=double, stand=stand)
+        new_hand = Hand(self.deal, self.player_type, tuple(counts), cards=cards, surrendered=surrendered, doubled=doubled, stand=stand)
         return new_hand
 
     @property
@@ -158,9 +165,7 @@ class Hand(metaclass=CachedInstance):
 
 
 if __name__ == '__main__':
-    from player import Player
     from rules import Rules
-    p = Player(Rules(), is_dealer=False)
-    h = Hand(p, cards='AT')
+    h = Hand(Rules(), 'P', cards='AT')
     print(f'Hand:\n{h}')
     print(f'Hand data:\n{h.state}')

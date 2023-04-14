@@ -2,22 +2,22 @@ import json
 import os
 
 from config import home_dir
+from hand import Hand
 from rules import Rules
 from shoe import Shoe
-from player import Player
 
 
 class Deal:
-    def __init__(self, rules=None, dealer=None, player=None):
+    def __init__(self, rules=None, dealer_hand=None, player_hands=None):
         self.rules = rules
         if self.rules is None:
             self.rules = Rules()
-        self.dealer = dealer
-        if self.dealer is None:
-            self.dealer = Player(self.rules, is_dealer=True)
-        self.player = player
-        if self.player is None:
-            self.player = Player(self.rules, is_dealer=False)
+        self.dealer_hand = dealer_hand
+        if self.dealer_hand is None:
+            self.dealer_hand = Hand(self, 'D')
+        self.player_hands = player_hands
+        if self.player_hands is None:
+            self.player_hands = [Hand(self, 'P')]
         self.shoe = Shoe(self.rules.decks)
 
     def __repr__(self):
@@ -37,22 +37,7 @@ class Deal:
 
     @property
     def name(self):
-        return f'{self.rules} # {self.dealer} # {self.player}'
-
-    @property
-    def next_player(self):
-        # Initial deal
-        for num_cards in [0, 1]:
-            for p in [self.player, self.dealer]:
-                if p.hand.num_cards == num_cards:
-                    return p
-        return None
-
-    @property
-    def next_player_symbol(self):
-        if self.next_player is None:
-            return None
-        return self.next_player.symbol
+        return f'{self.rules} # D {self.dealer_hand} # P {" ".join(str(self.player_hands))}'
 
     @property
     def next_hand(self):
@@ -66,7 +51,7 @@ class Deal:
     def next_hand_index(self):
         if self.next_hand is None:
             return None
-        return self.next_hand.index
+        return self.next_hand.split_index
 
     @property
     def next_hand_options(self):
@@ -83,7 +68,7 @@ class Deal:
             opt_states = {}
             if opt == 'Deal':
                 for c, p in self.shoe.pdf.items():
-                    nh = self.next_hand.new_state(card=c)
+                    nh = self.next_hand.new_hand(cards=c)
                     opt_states[c] = {
                         'state': nh.name,
                         'prob': p,
@@ -102,14 +87,13 @@ class Deal:
             'state': self.name,
             'rules': self.rules.state,
             'round': {
-                'next_player': self.next_player_symbol,
                 'next_hand': self.next_hand_index,
                 'options': self.next_hand_options,
                 'next_states': self.next_states,
             },
             'shoe': self.shoe.state,
-            'dealer': self.dealer.state,
-            'player': self.player.state,
+            'dealer': self.dealer_hand.state,
+            'player': [h.state for h in self.player_hands],
         }
 
 
