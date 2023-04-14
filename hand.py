@@ -10,23 +10,24 @@
         is_pair
         is_soft
         is_terminal
-
 """
+from config import CachedInstance
 
-class Hand:
+
+class Hand(metaclass=CachedInstance):
     symbols = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'A']
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, player, counts=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], cards=''):
+    def __init__(self, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), cards='', surrendered=False, doubled=False, stand=False):
         self.player = player
-        self.counts = counts
+        self.counts = list(counts)
         for c in cards:
             self.add(c)
+        self.surrendered = surrendered
+        self.doubled = doubled
+        self.stand = stand
         self.index = 0
-        self.surrendered = False
-        self.doubled = False
-        self.stand = False
 
     def __str__(self):
         return self.name
@@ -92,7 +93,24 @@ class Hand:
 
     @property
     def name(self):
-        return '-'.join([str(c) for c in self.counts])
+        s = '-'.join([str(c) for c in self.counts])
+        if self.surrendered:
+            s += '^R'
+        elif self.doubled:
+            s += '^D'
+        if self.stand:
+            s += '^S'
+        return s
+
+    def new_state(self, card='', surrender=None, double=None, stand=None):
+        if surrender is None:
+            surrender = self.surrendered
+        if double is None:
+            double = self.doubled
+        if stand is None:
+            stand = self.stand
+        new_hand = Hand(self.player, tuple(self.counts), cards=card, surrendered=surrender, doubled=double, stand=stand)
+        return new_hand
 
     @property
     def num_cards(self):

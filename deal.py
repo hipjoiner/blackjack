@@ -49,8 +49,47 @@ class Deal:
         return None
 
     @property
+    def next_player_symbol(self):
+        if self.next_player is None:
+            return None
+        return self.next_player.symbol
+
+    @property
+    def next_hand(self):
+        if self.next_player is None:
+            return None
+        if self.next_player.next_hand is None:
+            return None
+        return self.next_player.next_hand
+
+    @property
+    def next_hand_index(self):
+        if self.next_hand is None:
+            return None
+        return self.next_hand.index
+
+    @property
+    def next_hand_options(self):
+        if self.next_hand is None:
+            return None
+        return self.next_hand.options
+
+    @property
     def next_states(self):
-        return None
+        if self.next_hand_options is None:
+            return None
+        states = {}
+        for opt in self.next_hand_options:
+            opt_states = {}
+            if opt == 'Deal':
+                for c, p in self.shoe.pdf.items():
+                    nh = self.next_hand.new_state(card=c)
+                    opt_states[c] = {
+                        'state': nh.name,
+                        'prob': p,
+                    }
+            states[opt] = opt_states
+        return states
 
     def save(self):
         os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
@@ -60,22 +99,18 @@ class Deal:
     @property
     def state(self):
         return {
-            'name': self.name,
-            'fpath': self.fpath,
-            'table': self.rules.state,
+            'state': self.name,
+            'rules': self.rules.state,
             'round': {
-                'next_player': self.next_player.symbol,
-                'next_hand': self.next_player.next_hand.index,
-                'options': self.next_player.next_hand.options,
+                'next_player': self.next_player_symbol,
+                'next_hand': self.next_hand_index,
+                'options': self.next_hand_options,
+                'next_states': self.next_states,
             },
             'shoe': self.shoe.state,
             'dealer': self.dealer.state,
             'player': self.player.state,
         }
-
-    @property
-    def winner(self):
-        return None
 
 
 if __name__ == '__main__':
