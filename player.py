@@ -18,16 +18,19 @@ class Player:
     @property
     def is_done(self):
         for h in self.hands:
-            if not h.is_done:
+            if not h.is_terminal:
                 return False
         return True
 
     @property
     def name(self):
-        return f'P {" ".join(str(h) for h in self.hands)}'
+        return f'{self.symbol} {" ".join(str(h) for h in self.hands)}'
 
     @property
     def next_hand(self):
+        for h in self.hands:
+            if not h.is_terminal:
+                return h
         return None
 
     @property

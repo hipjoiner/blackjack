@@ -11,14 +11,6 @@
         is_soft
         is_terminal
 
-    Possible hand actions:
-        deal (card) (excludes other options)
-        blackjack (no card) (excludes other options) (end state)
-        surrender (no card) (end state)
-        split (card)
-        double (card) (end state)
-        hit (card)
-        stand (no card) (end state)
 """
 
 class Hand:
@@ -31,12 +23,40 @@ class Hand:
         self.counts = counts
         for c in cards:
             self.add(c)
+        self.index = 0
+        self.surrendered = False
+        self.doubled = False
+        self.stand = False
 
     def __str__(self):
         return self.name
 
     def add(self, card):
         self.counts[self.indexes[card]] += 1
+
+    @property
+    def can_deal(self):
+        return self.num_cards < 2
+
+    @property
+    def can_surrender(self):
+        return True
+
+    @property
+    def can_split(self):
+        return True
+
+    @property
+    def can_double(self):
+        return True
+
+    @property
+    def can_hit(self):
+        return True
+
+    @property
+    def can_stand(self):
+        return True
 
     @property
     def cards(self):
@@ -48,16 +68,15 @@ class Hand:
 
     @property
     def is_blackjack(self):
-        return self.total == 21 and self.num_cards == 2
+        return self.total == 21 and self.num_cards == 2 and self.player.splits == 0
 
     @property
     def is_busted(self):
         return self.total > 21
 
     @property
-    def is_done(self):
-        # Has hand reached a terminal state
-        return False
+    def is_maxed(self):
+        return self.total >= 21
 
     @property
     def is_pair(self):
@@ -68,6 +87,10 @@ class Hand:
         return self.total != self.hard_total
 
     @property
+    def is_terminal(self):
+        return self.options is None
+
+    @property
     def name(self):
         return '-'.join([str(c) for c in self.counts])
 
@@ -76,11 +99,35 @@ class Hand:
         return sum(self.counts)
 
     @property
+    def options(self):
+        if self.is_maxed or self.surrendered or self.doubled or self.stand:
+            return None
+        if self.can_deal:
+            return ['Deal']
+        opts = []
+        if self.can_surrender:
+            opts.append('Surrender')
+        if self.can_split:
+            opts.append('Split')
+        if self.can_double:
+            opts.append('Double')
+        if self.can_hit:
+            opts.append('Hit')
+        if self.can_stand:
+            opts.append('Stand')
+        if not opts:
+            return None
+        return opts
+
+    @property
     def state(self):
         return {
             'cards': self.cards,
             'total': self.total,
             'is_blackjack': self.is_blackjack,
+            'surrendered': self.surrendered,
+            'doubled': self.doubled,
+            'stand': self.stand,
             'is_soft': self.is_soft,
             'is_busted': self.is_busted,
         }

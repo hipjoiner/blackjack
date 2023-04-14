@@ -40,6 +40,15 @@ class Deal:
         return f'{self.rules} # {self.dealer} # {self.player}'
 
     @property
+    def next_player(self):
+        # Initial deal
+        for num_cards in [0, 1]:
+            for p in [self.player, self.dealer]:
+                if p.hand.num_cards == num_cards:
+                    return p
+        return None
+
+    @property
     def next_states(self):
         return None
 
@@ -55,23 +64,14 @@ class Deal:
             'fpath': self.fpath,
             'table': self.rules.state,
             'round': {
-                'next_to_play': self.next_to_play,
-                'winner': self.winner,
-                'next_states': self.next_states,
+                'next_player': self.next_player.symbol,
+                'next_hand': self.next_player.next_hand.index,
+                'options': self.next_player.next_hand.options,
             },
             'shoe': self.shoe.state,
             'dealer': self.dealer.state,
             'player': self.player.state,
         }
-
-    @property
-    def next_to_play(self):
-        # Initial deal
-        for num_cards in [0, 1]:
-            for p in [self.player, self.dealer]:
-                if p.hand.num_cards == num_cards:
-                    return p
-        return None
 
     @property
     def winner(self):
