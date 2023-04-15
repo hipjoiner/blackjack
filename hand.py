@@ -6,12 +6,10 @@ class Hand(metaclass=CachedInstance):
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, deal, player_type, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), surrendered=False, doubled=False, stand=False, cards=''):
+    def __init__(self, deal, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), surrendered=False, doubled=False, stand=False):
         self.deal = deal
-        self.player_type = player_type
-        self.counts = list(counts)
-        for c in cards:
-            self.add(c)
+        self.player = player
+        self.counts = counts
         self.surrendered = surrendered
         self.doubled = doubled
         self.stand = stand
@@ -19,36 +17,28 @@ class Hand(metaclass=CachedInstance):
     def __str__(self):
         return self.implied_name
 
-    def add(self, card):
-        self.counts[self.indexes[card]] += 1
-
     @property
     def can_deal(self):
         return self.num_cards < 2
 
     @property
     def can_surrender(self):
-        # FIXME
         return True
 
     @property
     def can_split(self):
-        # FIXME
         return True
 
     @property
     def can_double(self):
-        # FIXME
         return True
 
     @property
     def can_hit(self):
-        # FIXME
         return True
 
     @property
     def can_stand(self):
-        # FIXME
         return True
 
     @property
@@ -62,19 +52,26 @@ class Hand(metaclass=CachedInstance):
     @property
     def implied_name(self):
         s = '-'.join([str(c) for c in self.counts])
+        extra = ''
         if self.surrendered:
-            s += '^R'
+            extra += 'R'
         elif self.doubled:
-            s += '^D'
+            extra += 'D'
         if self.stand:
-            s += '^S'
+            extra += 'S'
+        if extra:
+            s += '^' + extra
         return s
+
+    @property
+    def instreams(self):
+        return tuple(self.counts), self.surrendered, self.doubled, self.stand
 
     @property
     def is_blackjack(self):
         if self.total != 21 or self.num_cards != 2:
             return False
-        if self.player_type == 'D':
+        if self.player == 'D':
             return True
         if self.deal.splits == 0:
             return True
@@ -100,20 +97,17 @@ class Hand(metaclass=CachedInstance):
     def is_terminal(self):
         return self.options is None
 
-    def new_hand(self, deal=None, player_type=None, counts=None, surrendered=None, doubled=None, stand=None, cards=''):
-        if deal is None:
-            deal = self.deal
-        if player_type is None:
-            player_type = self.player_type
-        if counts is None:
-            counts = self.counts
+    def new_hand(self, card='', surrendered=None, doubled=None, stand=None):
+        counts = list(self.counts)
+        if card:
+            counts[self.indexes[card]] += 1
         if surrendered is None:
             surrendered = self.surrendered
         if doubled is None:
             doubled = self.doubled
         if stand is None:
             stand = self.stand
-        new_hand = Hand(deal=deal, player_type=player_type, counts=tuple(counts), surrendered=surrendered, doubled=doubled, stand=stand, cards=cards)
+        new_hand = Hand(deal=self.deal, player=self.player, counts=tuple(counts), surrendered=surrendered, doubled=doubled, stand=stand)
         return new_hand
 
     @property
@@ -162,7 +156,6 @@ class Hand(metaclass=CachedInstance):
 
 
 if __name__ == '__main__':
-    from rules import Rules
     h = Hand(Rules(), 'P', cards='AT')
     print(f'Hand:\n{h}')
     print(f'Hand data:\n{h.state}')

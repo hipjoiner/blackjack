@@ -8,17 +8,17 @@ from shoe import Shoe
 
 
 class Deal:
-    def __init__(self, rules=None, dealer_hand=None, player_hands=None):
-        self.rules = rules
-        if self.rules is None:
-            self.rules = Rules()
-        self.dealer_hand = dealer_hand
-        if self.dealer_hand is None:
-            self.dealer_hand = Hand(self, 'D')
-        self.player_hands = player_hands
-        if self.player_hands is None:
-            self.player_hands = [Hand(self, 'P')]
-        self.shoe = Shoe(self.rules.decks)
+    def __init__(
+        self,
+        rules=(1.5, 6, False, 'Any2', 3, True, True, True),
+        dealer_hand=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, False, False),
+        player_hands=(((0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, False, False),)
+    ):
+        self.rules = Rules(*rules)
+        self.shoe = Shoe(self)
+        self.dealer = Hand(self, 'D', *dealer_hand)
+        self.player = [Hand(self, 'P', *ph) for ph in player_hands]
+        self.saves = 0
 
     def __repr__(self):
         return self.implied_name
@@ -30,7 +30,7 @@ class Deal:
 
     @property
     def implied_name(self):
-        return f'{self.rules} # D {self.dealer_hand} # P {" ".join(str(h) for h in self.player_hands)}'
+        return f'{self.rules.implied_name} {str(self.dealer)} {" ".join(str(h) for h in self.player)}'
 
     def load(self):
         if not os.path.isfile(self.fpath):
@@ -39,23 +39,36 @@ class Deal:
             contents = json.load(fp)
         return contents['deal']
 
+    def new_deal(self, index, hand):
+        dealer_hand = self.dealer
+        player_hands = self.player.copy()
+        if index is None:
+            dealer_hand = hand
+        else:
+            player_hands[index] = hand
+        return Deal(
+            rules=self.rules.instreams,
+            dealer_hand=dealer_hand.instreams,
+            player_hands=tuple(ph.instreams for ph in player_hands)
+        )
+
     @property
     def next_hand(self):
-        if self.dealer_hand.is_blackjack:
+        if self.dealer.is_blackjack:
             return None
-        for h in self.player_hands:
+        for h in self.player:
             if not h.is_terminal:
                 return h
-        if not self.dealer_hand.is_terminal:
-            return self.dealer_hand
+        if not self.dealer.is_terminal:
+            return self.dealer
         return None
 
     @property
     def next_hand_index(self):
         h = self.next_hand
-        if h == self.dealer_hand:
+        if h == self.dealer:
             return None
-        for i, ph in enumerate(self.player_hands):
+        for i, ph in enumerate(self.player):
             if h == ph:
                 return i
         return None
@@ -75,9 +88,13 @@ class Deal:
             opt_states = {}
             if opt == 'Deal':
                 for c, p in self.shoe.pdf.items():
-                    nh = self.next_hand.new_hand(cards=c)
+                    nh = self.next_hand.new_hand(card=c)
+                    nd = self.new_deal(self.next_hand_index, nh)
+                    if self.saves < 100:
+                        nd.save()
+                        self.saves += 1
                     opt_states[c] = {
-                        'state': nh.implied_name,
+                        'state': nd.implied_name,
                         'prob': p,
                     }
             states[opt] = opt_states
@@ -90,21 +107,21 @@ class Deal:
 
     @property
     def splits(self):
-        return len(self.player_hands) - 1
+        return len(self.player) - 1
 
     @property
     def state(self):
         return {
             'state': self.implied_name,
-            'rules': self.rules.state,
+            'rules': self.rules.implied_name,
             'round': {
                 'next_hand': self.next_hand_index,
                 'options': self.next_hand_options,
                 'next_states': self.next_states,
             },
             'shoe': self.shoe.pdf,
-            'dealer': self.dealer_hand.state,
-            'player': [h.state for h in self.player_hands],
+            'dealer': self.dealer.state,
+            'player': [h.state for h in self.player],
         }
 
 
