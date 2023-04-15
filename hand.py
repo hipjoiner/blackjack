@@ -1,16 +1,3 @@
-"""A Hand's cards are orderless. Properties:
-        count of cards of each rank
-        num_cards
-        hard_total
-        soft_total
-        total
-        is_blackjack
-        is_busted
-        is_doubled
-        is_pair
-        is_soft
-        is_terminal
-"""
 from config import CachedInstance
 
 
@@ -19,7 +6,7 @@ class Hand(metaclass=CachedInstance):
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, deal, player_type, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), cards='', surrendered=False, doubled=False, stand=False):
+    def __init__(self, deal, player_type, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), surrendered=False, doubled=False, stand=False, cards=''):
         self.deal = deal
         self.player_type = player_type
         self.counts = list(counts)
@@ -30,7 +17,7 @@ class Hand(metaclass=CachedInstance):
         self.stand = stand
 
     def __str__(self):
-        return self.name
+        return self.implied_name
 
     def add(self, card):
         self.counts[self.indexes[card]] += 1
@@ -73,8 +60,25 @@ class Hand(metaclass=CachedInstance):
         return sum([self.counts[i] * self.values[i] for i in self.indexes.values()])
 
     @property
+    def implied_name(self):
+        s = '-'.join([str(c) for c in self.counts])
+        if self.surrendered:
+            s += '^R'
+        elif self.doubled:
+            s += '^D'
+        if self.stand:
+            s += '^S'
+        return s
+
+    @property
     def is_blackjack(self):
-        return self.total == 21 and self.num_cards == 2 and self.player.splits == 0
+        if self.total != 21 or self.num_cards != 2:
+            return False
+        if self.player_type == 'D':
+            return True
+        if self.deal.splits == 0:
+            return True
+        return False
 
     @property
     def is_busted(self):
@@ -96,18 +100,11 @@ class Hand(metaclass=CachedInstance):
     def is_terminal(self):
         return self.options is None
 
-    @property
-    def name(self):
-        s = '-'.join([str(c) for c in self.counts])
-        if self.surrendered:
-            s += '^R'
-        elif self.doubled:
-            s += '^D'
-        if self.stand:
-            s += '^S'
-        return s
-
-    def new_hand(self, counts=None, cards='', surrendered=None, doubled=None, stand=None):
+    def new_hand(self, deal=None, player_type=None, counts=None, surrendered=None, doubled=None, stand=None, cards=''):
+        if deal is None:
+            deal = self.deal
+        if player_type is None:
+            player_type = self.player_type
         if counts is None:
             counts = self.counts
         if surrendered is None:
@@ -116,7 +113,7 @@ class Hand(metaclass=CachedInstance):
             doubled = self.doubled
         if stand is None:
             stand = self.stand
-        new_hand = Hand(self.deal, self.player_type, tuple(counts), cards=cards, surrendered=surrendered, doubled=doubled, stand=stand)
+        new_hand = Hand(deal=deal, player_type=player_type, counts=tuple(counts), surrendered=surrendered, doubled=doubled, stand=stand, cards=cards)
         return new_hand
 
     @property

@@ -21,12 +21,16 @@ class Deal:
         self.shoe = Shoe(self.rules.decks)
 
     def __repr__(self):
-        return self.name
+        return self.implied_name
 
     @property
     def fpath(self):
-        p = f'{home_dir}/states/{self.name}.json'
+        p = f'{home_dir}/states/{self.implied_name}.json'
         return p
+
+    @property
+    def implied_name(self):
+        return f'{self.rules} # D {self.dealer_hand} # P {" ".join(str(h) for h in self.player_hands)}'
 
     def load(self):
         if not os.path.isfile(self.fpath):
@@ -36,22 +40,25 @@ class Deal:
         return contents['deal']
 
     @property
-    def name(self):
-        return f'{self.rules} # D {self.dealer_hand} # P {" ".join(str(self.player_hands))}'
-
-    @property
     def next_hand(self):
-        if self.next_player is None:
+        if self.dealer_hand.is_blackjack:
             return None
-        if self.next_player.next_hand is None:
-            return None
-        return self.next_player.next_hand
+        for h in self.player_hands:
+            if not h.is_terminal:
+                return h
+        if not self.dealer_hand.is_terminal:
+            return self.dealer_hand
+        return None
 
     @property
     def next_hand_index(self):
-        if self.next_hand is None:
+        h = self.next_hand
+        if h == self.dealer_hand:
             return None
-        return self.next_hand.split_index
+        for i, ph in enumerate(self.player_hands):
+            if h == ph:
+                return i
+        return None
 
     @property
     def next_hand_options(self):
@@ -70,7 +77,7 @@ class Deal:
                 for c, p in self.shoe.pdf.items():
                     nh = self.next_hand.new_hand(cards=c)
                     opt_states[c] = {
-                        'state': nh.name,
+                        'state': nh.implied_name,
                         'prob': p,
                     }
             states[opt] = opt_states
@@ -82,16 +89,20 @@ class Deal:
             json.dump(self.state, fp, indent=4)
 
     @property
+    def splits(self):
+        return len(self.player_hands) - 1
+
+    @property
     def state(self):
         return {
-            'state': self.name,
+            'state': self.implied_name,
             'rules': self.rules.state,
             'round': {
                 'next_hand': self.next_hand_index,
                 'options': self.next_hand_options,
                 'next_states': self.next_states,
             },
-            'shoe': self.shoe.state,
+            'shoe': self.shoe.pdf,
             'dealer': self.dealer_hand.state,
             'player': [h.state for h in self.player_hands],
         }

@@ -15,10 +15,6 @@ class Shoe:
         return dict(zip(self.symbols, self.counts))
 
     @property
-    def name(self):
-        return '-'.join([str(c) for c in self.counts])
-
-    @property
     def num_cards(self):
         return sum(self.counts)
 
@@ -26,13 +22,6 @@ class Shoe:
     def pdf(self):
         probs = [self.counts[i] / self.num_cards if self.num_cards != 0 else 0 for i in self.indexes.values()]
         return dict(zip(self.symbols, probs))
-
-    @property
-    def state(self):
-        return {
-            'cards': self.cards,
-            'pdf': self.pdf,
-        }
 
 
 if __name__ == '__main__':
