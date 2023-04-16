@@ -19,6 +19,27 @@ class Hand:
         return self.implied_name
 
     @property
+    def actions(self):
+        if self.is_maxed or self.surrendered or self.doubled or self.stand:
+            return None
+        if self.can_deal:
+            return ['Deal']
+        acts = []
+        if self.can_surrender:
+            acts.append('Surrender')
+        if self.can_split:
+            acts.append('Split')
+        if self.can_double:
+            acts.append('Double')
+        if self.can_hit:
+            acts.append('Hit')
+        if self.can_stand:
+            acts.append('Stand')
+        if not acts:
+            return None
+        return acts
+
+    @property
     def can_deal(self):
         return self.num_cards < 2
 
@@ -135,7 +156,7 @@ class Hand:
 
     @property
     def is_terminal(self):
-        return self.options is None
+        return self.actions is None
 
     def new_hand(self, card='', surrendered=None, doubled=None, stand=None):
         counts = list(self.counts)
@@ -153,27 +174,6 @@ class Hand:
     @property
     def num_cards(self):
         return sum(self.counts)
-
-    @property
-    def options(self):
-        if self.is_maxed or self.surrendered or self.doubled or self.stand:
-            return None
-        if self.can_deal:
-            return ['Deal']
-        opts = []
-        if self.can_surrender:
-            opts.append('Surrender')
-        if self.can_split:
-            opts.append('Split')
-        if self.can_double:
-            opts.append('Double')
-        if self.can_hit:
-            opts.append('Hit')
-        if self.can_stand:
-            opts.append('Stand')
-        if not opts:
-            return None
-        return opts
 
     @property
     def splits(self):
