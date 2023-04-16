@@ -1,15 +1,16 @@
 from config import CachedInstance
 
 
-class Hand(metaclass=CachedInstance):
+class Hand:
     symbols = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'A']
     values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
     indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
 
-    def __init__(self, deal, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), surrendered=False, doubled=False, stand=False):
+    def __init__(self, deal, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), showing='', surrendered=False, doubled=False, stand=False):
         self.deal = deal
         self.player = player
         self.counts = counts
+        self.showing = showing
         self.surrendered = surrendered
         self.doubled = doubled
         self.stand = stand
@@ -23,22 +24,46 @@ class Hand(metaclass=CachedInstance):
 
     @property
     def can_surrender(self):
-        return True
+        if self.is_dealer:
+            return False
+        if self.surrendered or self.doubled or self.stand:
+            return False
+        return self.num_cards == 2 and self.deal.splits == 0
 
     @property
     def can_split(self):
-        return True
+        if self.is_dealer:
+            return False
+        return self.is_pair and self
 
     @property
     def can_double(self):
+        if self.is_dealer:
+            return False
+        if self.surrendered or self.doubled or self.stand:
+            return False
+        if self.num_cards != 2:
+            return False
         return True
 
     @property
     def can_hit(self):
+        if self.is_dealer:
+            if self.total <= 16:
+                return True
+            if self.deal.rules.hit_soft_17 and self.total == 17 and self.is_soft:
+                return True
+            return False
+        if self.surrendered or self.doubled or self.stand:
+            return False
         return True
 
     @property
     def can_stand(self):
+        if self.is_dealer:
+            return not self.can_hit
+        if self.surrendered or self.doubled or self.stand:
+            return False
         return True
 
     @property
@@ -57,6 +82,8 @@ class Hand(metaclass=CachedInstance):
     def implied_name(self):
         s = '-'.join([str(c) for c in self.counts])
         extra = ''
+        if self.showing:
+            extra += self.showing
         if self.surrendered:
             extra += 'R'
         elif self.doubled:
@@ -64,21 +91,18 @@ class Hand(metaclass=CachedInstance):
         if self.stand:
             extra += 'S'
         if extra:
-            s += '^' + extra
+            s = extra + '^' + s
         return s
 
     @property
     def instreams(self):
-        return tuple(self.counts), self.surrendered, self.doubled, self.stand
+        return tuple(self.counts), self.showing, self.surrendered, self.doubled, self.stand
 
     @property
     def is_blackjack(self):
-        if self.total != 21 or self.num_cards != 2:
-            return False
-        if self.player == 'D':
-            return True
-        if self.deal.splits == 0:
-            return True
+        if self.num_cards == 2 and self.total == 21:
+            if self.is_dealer or self.splits == 0:
+                return True
         return False
 
     @property
@@ -86,10 +110,14 @@ class Hand(metaclass=CachedInstance):
         return self.total > 21
 
     @property
+    def is_dealer(self):
+        return self.player == 'D'
+
+    @property
     def is_decided(self):
         if self.is_blackjack or self.deal.dealer.is_blackjack:
             return True
-        if self.is_busted:
+        if self.is_busted or self.surrendered:
             return True
         return self.is_terminal and self.deal.dealer.is_terminal
 
@@ -148,16 +176,22 @@ class Hand(metaclass=CachedInstance):
         return opts
 
     @property
+    def splits(self):
+        return self.deal.splits
+
+    @property
     def state(self):
         return {
             'cards': self.cards,
-            'total': self.total,
-            'is_soft': self.is_soft,
-            'is_blackjack': self.is_blackjack,
             'surrendered': self.surrendered,
             'doubled': self.doubled,
-            'is_busted': self.is_busted,
             'stand': self.stand,
+            'total': self.total,
+            'is_blackjack': self.is_blackjack,
+            'is_busted': self.is_busted,
+            'is_decided': self.is_decided,
+            'is_soft': self.is_soft,
+            'is_terminal': self.is_terminal,
             'winner': self.winner,
             'value': self.value,
         }
