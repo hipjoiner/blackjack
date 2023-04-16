@@ -28,7 +28,8 @@ class Shoe:
 
     @property
     def counts(self):
-        return self.base_counts - self.cards_out
+        c = self.base_counts - self.cards_out
+        return c.tolist()
 
     @property
     def num_cards(self):

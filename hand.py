@@ -43,7 +43,11 @@ class Hand(metaclass=CachedInstance):
 
     @property
     def cards(self):
-        return dict(zip(self.symbols, self.counts))
+        # Shorthand representation for viewing
+        cstr = ''
+        for i, c in enumerate(self.counts):
+            cstr += self.symbols[i] * c
+        return cstr
 
     @property
     def hard_total(self):
@@ -80,6 +84,14 @@ class Hand(metaclass=CachedInstance):
     @property
     def is_busted(self):
         return self.total > 21
+
+    @property
+    def is_decided(self):
+        if self.is_blackjack or self.deal.dealer.is_blackjack:
+            return True
+        if self.is_busted:
+            return True
+        return self.is_terminal and self.deal.dealer.is_terminal
 
     @property
     def is_maxed(self):
@@ -140,12 +152,14 @@ class Hand(metaclass=CachedInstance):
         return {
             'cards': self.cards,
             'total': self.total,
+            'is_soft': self.is_soft,
             'is_blackjack': self.is_blackjack,
             'surrendered': self.surrendered,
             'doubled': self.doubled,
-            'stand': self.stand,
-            'is_soft': self.is_soft,
             'is_busted': self.is_busted,
+            'stand': self.stand,
+            'winner': self.winner,
+            'value': self.value,
         }
 
     @property
@@ -154,8 +168,50 @@ class Hand(metaclass=CachedInstance):
             return self.hard_total + 10
         return self.hard_total
 
+    @property
+    def value(self):
+        if self.winner is None:
+            return None
+        if self.winner == 'Player':
+            if self.is_blackjack:
+                return self.deal.rules.blackjack_pays
+            if self.doubled:
+                return 2.0
+            return 1.0
+        if self.winner == 'Dealer':
+            if self.surrendered:
+                return -0.5
+            if self.doubled:
+                return -2.0
+            return -1.0
+        return 0.0
+
+    @property
+    def winner(self):
+        if not self.is_decided:
+            return None
+        dealer = self.deal.dealer
+        if self.is_blackjack:
+            if dealer.is_blackjack:
+                return 'Push'
+            return 'Player'
+        if self.surrendered:
+            return 'Dealer'
+        if dealer.is_blackjack:
+            return 'Dealer'
+        if self.is_busted:
+            return 'Dealer'
+        if dealer.is_busted:
+            return 'Player'
+        if self.total > dealer.total:
+            return 'Player'
+        if self.total < dealer.total:
+            return 'Dealer'
+        return 'Push'
+
 
 if __name__ == '__main__':
-    h = Hand(Rules(), 'P', cards='AT')
-    print(f'Hand:\n{h}')
-    print(f'Hand data:\n{h.state}')
+    # h = Hand(Rules(), 'P', cards='AT')
+    # print(f'Hand:\n{h}')
+    # print(f'Hand data:\n{h.state}')
+    pass
