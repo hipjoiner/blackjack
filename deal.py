@@ -1,3 +1,4 @@
+from functools import cached_property
 import json
 import os
 
@@ -8,8 +9,6 @@ from shoe import Shoe
 
 
 class Deal(metaclass=CachedInstance):
-    saves = 0
-
     def __init__(
         self,
         rules=(1.5, 6, False, 'Any2', 3, True, True, True),
@@ -20,7 +19,6 @@ class Deal(metaclass=CachedInstance):
         self.shoe = Shoe(self)
         self.dealer = Hand(self, 'D', *dealer_hand)
         self.player = [Hand(self, 'P', *ph) for ph in player_hands]
-        self.saves = 0
         log(f'{self.implied_name}...')
 
     def __repr__(self):
@@ -28,8 +26,7 @@ class Deal(metaclass=CachedInstance):
 
     @property
     def fpath(self):
-        p = f'{home_dir}/states/{self.implied_name}.json'
-        return p
+        return f'{home_dir}/states/{self.implied_name}.json'
 
     @staticmethod
     def from_cards(cards):
@@ -44,7 +41,7 @@ class Deal(metaclass=CachedInstance):
         return f'{self.rules.implied_name} {str(self.dealer)} {" ".join(str(h) for h in self.player)}'
 
     @property
-    def is_terminal(self):
+    def is_done(self):
         return self.next_hand is None
 
     def load(self):
@@ -54,42 +51,131 @@ class Deal(metaclass=CachedInstance):
             contents = json.load(fp)
         return contents['deal']
 
-    def new_deal(self, card='', surrendered=None, doubled=None, stand=None):
+    def new_deal(self, card='', surrendered=None, doubled=None, stand=None, split=False):
         dealer_hand = self.dealer
         player_hands = self.player.copy()
-        index = self.next_hand_index
         old_hand = self.next_hand
-        sur = old_hand.surrendered
-        if surrendered is not None:
-            sur = surrendered
-        dbl = old_hand.doubled
-        if doubled is not None:
-            dbl = doubled
-        std = old_hand.stand
-        if stand is not None:
-            std = stand
-        new_hand = self.next_hand.new_hand(card=card, surrendered=sur, doubled=dbl, stand=std)
-        if index is None:
+        sur = old_hand.surrendered if surrendered is None else surrendered
+        dbl = old_hand.doubled if doubled is None else doubled
+        std = old_hand.stand if stand is None else stand
+        new_hand = self.next_hand.new_hand(card=card, surrendered=sur, doubled=dbl, stand=std, split=split)
+        if self.next_player == 'Dealer':
             dealer_hand = new_hand
         else:
-            player_hands[index] = new_hand
+            if split:
+                player_hands[self.next_hand_index] = new_hand[0]
+                player_hands.append(new_hand[1])
+            else:
+                player_hands[self.next_hand_index] = new_hand
         return Deal(
             rules=self.rules.instreams,
             dealer_hand=dealer_hand.instreams,
             player_hands=tuple(ph.instreams for ph in player_hands)
         )
 
-    @property
+    @cached_property
+    def next_states(self):
+        if self.next_actions is None:
+            return None
+        result = {}
+        for action in self.next_actions:
+            if action == 'Deal':
+                result['Deal'] = self.next_states_adding_card()
+            elif action == 'Surrender':
+                sub_deal = self.new_deal(surrendered=True)
+                result['Surrender'] = {
+                    'state': sub_deal,
+                    'prob': 1.0,
+                    'to_play': sub_deal.next_player,
+                }
+            elif action == 'Split':
+                sub_deal = self.new_deal(split=True)
+                result['Split'] = {
+                    'state': sub_deal,
+                    'prob': 1.0,
+                    'to_play': sub_deal.next_player,
+                }
+            elif action == 'Double':
+                result['Double'] = self.next_states_adding_card(doubled=True)
+            elif action == 'Hit':
+                result['Hit'] = self.next_states_adding_card()
+            elif action == 'Stand':
+                sub_deal = self.new_deal(stand=True)
+                result['Stand'] = {
+                    'state': sub_deal,
+                    'prob': 1.0,
+                    'to_play': sub_deal.next_player,
+                }
+            else:
+                raise ValueError(f'Bad action "{action}"')
+        return result
+
+    def next_states_adding_card(self, doubled=None):
+        # A Deal action gets a new card, so we enumerate states by new card.
+        card_states = {}
+        for card, prob in self.shoe.pdf.items():
+            sub_deal = self.new_deal(card, doubled=doubled)
+            card_states[card] = {
+                'state': sub_deal,
+                'prob': prob,
+                'to_play': sub_deal.next_player,
+            }
+        return {
+            'cards': card_states,
+        }
+
+    @cached_property
+    def next_states_recursive(self):
+        if self.next_states is None:
+            return None
+        result = {}
+        for action, action_info in self.next_states.items():
+            if 'cards' not in action_info and action_info['to_play'] is None:
+                result[action] = action_info
+            else:
+                result[action] = {}
+                if 'cards' not in action_info:
+                    x = 3
+                card_states = action_info['cards']
+                for card, info in card_states.items():
+                    result[action][card] = info
+                    result[action][card]['actions'] = info['state'].next_states_recursive
+        return result
+
+    @cached_property
+    def next_actions(self):
+        if self.next_hand is None:
+            return None
+        return self.next_hand.actions
+
+    @cached_property
     def next_hand(self):
+        if self.next_player is None:
+            return None
+        elif self.next_player == 'Dealer':
+            return self.dealer
+        else:
+            return self.player[self.next_hand_index]
+
+    @cached_property
+    def next_hand_index(self):
+        if self.next_player != 'Player':
+            return None
+        for i, h in enumerate(self.player):
+            if not h.is_done:
+                return i
+
+    @cached_property
+    def next_player(self):
         # Deal phase
         if self.player[0].num_cards == 0:
-            return self.player[0]
+            return 'Player'
         if self.dealer.num_cards == 0:
-            return self.dealer
+            return 'Dealer'
         if self.player[0].num_cards == 1:
-            return self.player[0]
+            return 'Player'
         if self.dealer.num_cards == 1:
-            return self.dealer
+            return 'Dealer'
 
         # Check for Blackjacks phase
         if self.dealer.is_blackjack:
@@ -106,112 +192,27 @@ class Deal(metaclass=CachedInstance):
             return None
 
         for h in self.player:
-            if not h.is_terminal:
-                return h
-        if not self.dealer.is_terminal:
-            return self.dealer
+            if not h.is_done:
+                return 'Player'
+        if not self.dealer.is_done:
+            return 'Dealer'
         return None
-
-    @property
-    def next_hand_index(self):
-        h = self.next_hand
-        if h == self.dealer:
-            return None
-        for i, ph in enumerate(self.player):
-            if h == ph:
-                return i
-        return None
-
-    @property
-    def next_hand_actions(self):
-        if self.next_hand is None:
-            return None
-        return self.next_hand.actions
-
-    @property
-    def next_states(self):
-        if self.next_hand_actions is None:
-            return None
-        states = {}
-        for action in self.next_hand_actions:
-            if action == 'Deal':
-                states['Deal'] = self.next_states_add_card()
-            elif action == 'Surrender':
-                # A Surrender gets no new card, just a new state
-                states['Surrender'] = {
-                    'calcs': {
-                        'nodes': 1,
-                        'value': -0.5,
-                    }
-                }
-            elif action == 'Split':
-                states['Split'] = {}
-            elif action == 'Double':
-                states['Double'] = self.next_states_add_card(doubled=True)
-            elif action == 'Hit':
-                states['Hit'] = self.next_states_add_card()
-            elif action == 'Stand':
-                new_deal = self.new_deal(stand=True)
-                states['Stand'] = {
-                    'calcs': {
-                        'nodes': None,
-                        'value': None,
-                    },
-                    'children': {
-                        '': {
-                            'state': new_deal.implied_name,
-                            'prob': 1.0,
-                        } | new_deal.state_calcs
-                    }
-                }
-        for action, data in states.items():
-            if 'children' in states[action]:
-                states[action]['calcs'] = self.next_states_calcs(states[action]['children'])
-        return states
-
-    def next_states_add_card(self, doubled=None):
-        # A Deal action gets a new card, so we enumerate states by new card.
-        children = {}
-        for card, prob in self.shoe.pdf.items():
-            new_deal = self.new_deal(card, doubled=doubled)
-            new_deal.save()
-            Deal.saves += 1
-            children[card] = {
-                'state': new_deal.implied_name,
-                'prob': prob,
-            }
-            # for key, val in new_deal.state_calcs.items():
-            #     children[card][key] = val
-            children[card] = children[card] | new_deal.state_calcs
-        result = {
-            'children': children
-        }
-        return result
-
-    def next_states_calcs(self, children):
-        # Iterate through the child states to see if we have terminal/summary info on all, in which case we summarize at this level.
-        nodes = 0
-        value = 0
-        for card, data in children.items():
-            if not data['terminal']:
-                nodes = None
-                value = None
-                break
-            nodes += data['nodes']
-            value += data['prob'] * data['value']
-        result = {
-            'nodes': nodes,
-            'value': value,
-        }
-        return result
-
 
     def save(self):
+        data = self.state_for_json()
         log(f'Saving {self.fpath}...')
         os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
-        s = self.state      # Computing this may involve loading it, which we must do before we open the file to write
         with open(self.fpath, 'w') as fp:
-            json.dump(s, fp, indent=4)
+            json.dump(data, fp, indent=4)
+
+    @cached_property
+    def saved_state(self):
+        if not os.path.isfile(self.fpath):
+            return None
+        log(f'Loading saved state {self.fpath}...')
+        with open(self.fpath, 'r') as fp:
+            state = json.load(fp)
+        return state
 
     @property
     def splits(self):
@@ -219,9 +220,12 @@ class Deal(metaclass=CachedInstance):
 
     @property
     def state(self):
-        return {
-            'state': self.implied_name,
-            'calcs': self.state_calcs,
+        result = {
+            'summary': {
+                'state': self.implied_name,
+                'to_play': self.next_player,
+            },
+            'children': self.next_states_recursive,
             'player': [h.state for h in self.player],
             'dealer': self.dealer.state,
             'rules': self.rules.implied_name,
@@ -230,38 +234,26 @@ class Deal(metaclass=CachedInstance):
                 'pdf': self.shoe.pdf,
             },
         }
+        if self.next_hand_index is not None:
+            result['summary']['hand_index'] = self.next_hand_index
+        return result
+
+    def state_for_json(self, data=None):
+        if data is None:
+            data = self.state
+        mod_data = {}
+        for tag, val in data.items():
+            if tag == 'state':
+                mod_data[tag] = str(val)
+            elif isinstance(val, dict):
+                mod_data[tag] = self.state_for_json(val)
+            else:
+                mod_data[tag] = val
+        return mod_data
 
     @property
-    def state_calcs(self):
-        if os.path.isfile(self.fpath):
-            log(f'Loading {self.fpath}...')
-            with open(self.fpath, 'r') as fp:
-                data = json.load(fp)
-            calcs = data['calcs']
-            calcs['loaded'] = True
-        else:
-            if self.next_hand == self.dealer:
-                to_play = 'Dealer'
-            elif self.next_hand is None:
-                to_play = None
-            else:
-                to_play = 'Player'
-            calcs = {
-                'terminal': self.is_terminal,
-                'nodes': 1 if self.is_terminal else None,
-                'loaded': False,
-            }
-            if self.is_terminal:
-                calcs['value'] = self.value
-            else:
-                calcs['hand_to_play'] = to_play
-                calcs['hand_index'] = self.next_hand_index
-                calcs['actions'] = self.next_states
-        return calcs
-
-    @property
-    def value(self):
-        if not self.is_terminal:
+    def terminal_value(self):
+        if not self.is_done:
             return None
         val = 0
         for h in self.player:
@@ -270,5 +262,5 @@ class Deal(metaclass=CachedInstance):
 
 
 if __name__ == '__main__':
-    deal = Deal.from_cards('A58')
+    deal = Deal.from_cards('T59T')
     deal.save()

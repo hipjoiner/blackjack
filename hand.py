@@ -20,7 +20,7 @@ class Hand:
 
     @property
     def actions(self):
-        if self.is_maxed or self.surrendered or self.doubled or self.stand:
+        if self.surrendered or self.doubled or self.stand or self.total >= 21:
             return None
         if self.can_deal:
             return ['Deal']
@@ -101,19 +101,19 @@ class Hand:
 
     @property
     def implied_name(self):
-        s = '-'.join([str(c) for c in self.counts])
-        extra = ''
+        mods = ''
         if self.showing:
-            extra += self.showing
+            mods += self.showing
         if self.surrendered:
-            extra += 'R'
-        elif self.doubled:
-            extra += 'D'
+            mods += 'R'
+        if self.doubled:
+            mods += 'D'
         if self.stand:
-            extra += 'S'
-        if extra:
-            s = extra + '^' + s
-        return s
+            mods += 'S'
+        if mods:
+            mods += '^'
+        cards = ''.join([self.symbols[i] * int(count) for i, count in enumerate(self.counts)])
+        return mods + cards
 
     @property
     def instreams(self):
@@ -140,11 +140,11 @@ class Hand:
             return True
         if self.is_busted or self.surrendered:
             return True
-        return self.is_terminal and self.deal.dealer.is_terminal
+        return self.is_done and self.deal.dealer.is_done
 
     @property
-    def is_maxed(self):
-        return self.total >= 21
+    def is_done(self):
+        return self.actions is None
 
     @property
     def is_pair(self):
@@ -154,21 +154,20 @@ class Hand:
     def is_soft(self):
         return self.total != self.hard_total
 
-    @property
-    def is_terminal(self):
-        return self.actions is None
-
-    def new_hand(self, card='', surrendered=None, doubled=None, stand=None):
+    def new_hand(self, card='', surrendered=None, doubled=None, stand=None, split=False):
         counts = list(self.counts)
+        if split:
+            counts = [c / 2 for c in counts]
+            return [
+                Hand(deal=self.deal, player=self.player, counts=tuple(counts)),
+                Hand(deal=self.deal, player=self.player, counts=tuple(counts))
+            ]
         if card:
             counts[self.indexes[card]] += 1
-        if surrendered is None:
-            surrendered = self.surrendered
-        if doubled is None:
-            doubled = self.doubled
-        if stand is None:
-            stand = self.stand
-        new_hand = Hand(deal=self.deal, player=self.player, counts=tuple(counts), surrendered=surrendered, doubled=doubled, stand=stand)
+        sur = self.surrendered if surrendered is None else surrendered
+        dbl = self.doubled if doubled is None else doubled
+        std = self.stand if stand is None else stand
+        new_hand = Hand(deal=self.deal, player=self.player, counts=tuple(counts), surrendered=sur, doubled=dbl, stand=std)
         return new_hand
 
     @property
@@ -183,15 +182,15 @@ class Hand:
     def state(self):
         return {
             'cards': self.cards,
+            'total': self.total,
+            'is_done': self.is_done,
             'surrendered': self.surrendered,
             'doubled': self.doubled,
             'stand': self.stand,
-            'total': self.total,
             'is_blackjack': self.is_blackjack,
             'is_busted': self.is_busted,
             'is_decided': self.is_decided,
             'is_soft': self.is_soft,
-            'is_terminal': self.is_terminal,
             'winner': self.winner,
             'value': self.value,
         }
