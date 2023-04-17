@@ -135,69 +135,76 @@ class Deal(metaclass=CachedInstance):
         states = {}
         for action in self.next_hand_actions:
             if action == 'Deal':
-                states['Deal'] = self.next_states_deal()
+                states['Deal'] = self.next_states_add_card()
             elif action == 'Surrender':
                 # A Surrender gets no new card, just a new state
-                action_states = {
+                states['Surrender'] = {
                     'calcs': {
                         'nodes': 1,
                         'value': -0.5,
                     }
                 }
             elif action == 'Split':
-                pass
+                states['Split'] = {}
             elif action == 'Double':
-                pass
+                states['Double'] = self.next_states_add_card(doubled=True)
             elif action == 'Hit':
-                pass
+                states['Hit'] = self.next_states_add_card()
             elif action == 'Stand':
                 new_deal = self.new_deal(stand=True)
-                action_states = {
+                states['Stand'] = {
                     'calcs': {
                         'nodes': None,
                         'value': None,
                     },
                     'children': {
-                        'state': new_deal.implied_name,
-                        'prob': 1.0,
+                        '': {
+                            'state': new_deal.implied_name,
+                            'prob': 1.0,
+                        } | new_deal.state_calcs
                     }
                 }
-            states[action] = action_states
+        for action, data in states.items():
+            if 'children' in states[action]:
+                states[action]['calcs'] = self.next_states_calcs(states[action]['children'])
         return states
 
-    def next_states_deal(self):
+    def next_states_add_card(self, doubled=None):
         # A Deal action gets a new card, so we enumerate states by new card.
-        cards = {}
+        children = {}
         for card, prob in self.shoe.pdf.items():
-            new_deal = self.new_deal(card)
+            new_deal = self.new_deal(card, doubled=doubled)
             new_deal.save()
             Deal.saves += 1
-            cards[card] = {
+            children[card] = {
                 'state': new_deal.implied_name,
                 'prob': prob,
             }
-            for key, val in new_deal.state_calcs.items():
-                cards[card][key] = val
+            # for key, val in new_deal.state_calcs.items():
+            #     children[card][key] = val
+            children[card] = children[card] | new_deal.state_calcs
+        result = {
+            'children': children
+        }
+        return result
+
+    def next_states_calcs(self, children):
         # Iterate through the child states to see if we have terminal/summary info on all, in which case we summarize at this level.
         nodes = 0
         value = 0
-        all_terminal = True
-        for card, data in cards.items():
+        for card, data in children.items():
             if not data['terminal']:
                 nodes = None
                 value = None
-                all_terminal = False
                 break
             nodes += data['nodes']
             value += data['prob'] * data['value']
         result = {
-            'calcs': {
-                'nodes': nodes,
-                'value': value,
-            },
-            'children': cards,
+            'nodes': nodes,
+            'value': value,
         }
         return result
+
 
     def save(self):
         log(f'Saving {self.fpath}...')
