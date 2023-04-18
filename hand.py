@@ -91,8 +91,8 @@ class Hand:
     def cards(self):
         # Shorthand representation for viewing
         cstr = ''
-        for i, c in enumerate(self.counts):
-            cstr += self.symbols[i] * c
+        for i in [9, 0, 1, 2, 3, 4, 5, 6, 7, 8]:    # Sort Aces first, tens last, just for aesthetics
+            cstr += self.symbols[i] * int(self.counts[i])
         return cstr
 
     @property
@@ -112,8 +112,7 @@ class Hand:
             mods += 'S'
         if mods:
             mods += '^'
-        cards = ''.join([self.symbols[i] * int(count) for i, count in enumerate(self.counts)])
-        return mods + cards
+        return mods + self.cards
 
     @property
     def instreams(self):
@@ -136,6 +135,8 @@ class Hand:
 
     @property
     def is_decided(self):
+        if self.deal.dealer.num_cards < 2:
+            return False
         if self.is_blackjack or self.deal.dealer.is_blackjack:
             return True
         if self.is_busted or self.surrendered:
@@ -175,6 +176,29 @@ class Hand:
         return sum(self.counts)
 
     @property
+    def outcome(self):
+        if not self.is_decided:
+            return None
+        dealer = self.deal.dealer
+        if self.is_blackjack:
+            if dealer.is_blackjack:
+                return 'Push'
+            return 'Blackjack'
+        if self.surrendered:
+            return 'Surrender'
+        if dealer.is_blackjack:
+            return 'Lose'
+        if self.is_busted:
+            return 'Bust'
+        if dealer.is_busted:
+            return 'Win'
+        if self.total > dealer.total:
+            return 'Win'
+        if self.total < dealer.total:
+            return 'Lose'
+        return 'Push'
+
+    @property
     def splits(self):
         return self.deal.splits
 
@@ -191,7 +215,7 @@ class Hand:
             'is_busted': self.is_busted,
             'is_decided': self.is_decided,
             'is_soft': self.is_soft,
-            'winner': self.winner,
+            'outcome': self.outcome,
             'value': self.value,
         }
 
@@ -202,45 +226,31 @@ class Hand:
         return self.hard_total
 
     @property
-    def value(self):
-        if self.winner is None:
+    def valuation(self):
+        if self.value is None:
             return None
-        if self.winner == 'Player':
-            if self.is_blackjack:
-                return self.deal.rules.blackjack_pays
+        return {
+            'outcome': self.outcome,
+            'value': self.value,
+        }
+
+    @property
+    def value(self):
+        if self.outcome is None:
+            return None
+        if self.outcome == 'Blackjack':
+            return self.deal.rules.blackjack_pays
+        if self.outcome == 'Surrender':
+            return -0.5
+        if self.outcome == 'Win':
             if self.doubled:
                 return 2.0
             return 1.0
-        if self.winner == 'Dealer':
-            if self.surrendered:
-                return -0.5
+        if self.outcome in ['Bust', 'Lose']:
             if self.doubled:
                 return -2.0
             return -1.0
         return 0.0
-
-    @property
-    def winner(self):
-        if not self.is_decided:
-            return None
-        dealer = self.deal.dealer
-        if self.is_blackjack:
-            if dealer.is_blackjack:
-                return 'Push'
-            return 'Player'
-        if self.surrendered:
-            return 'Dealer'
-        if dealer.is_blackjack:
-            return 'Dealer'
-        if self.is_busted:
-            return 'Dealer'
-        if dealer.is_busted:
-            return 'Player'
-        if self.total > dealer.total:
-            return 'Player'
-        if self.total < dealer.total:
-            return 'Dealer'
-        return 'Push'
 
 
 if __name__ == '__main__':
