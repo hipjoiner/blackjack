@@ -1,16 +1,11 @@
-from config import CachedInstance
+from config import card_symbols, card_values, card_indexes
 
 
 class Hand:
-    symbols = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'A']
-    values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]
-    indexes = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'A': 9}
-
-    def __init__(self, deal, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), showing='', surrendered=False, doubled=False, stand=False):
+    def __init__(self, deal, player, counts=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), surrendered=False, doubled=False, stand=False):
         self.deal = deal
         self.player = player
         self.counts = counts
-        self.showing = showing
         self.surrendered = surrendered
         self.doubled = doubled
         self.stand = stand
@@ -24,6 +19,8 @@ class Hand:
             return None
         if self.can_deal:
             return ['Deal']
+        if self.can_turn:
+            return ['Turn']
         acts = []
         if self.can_surrender:
             acts.append('Surrender')
@@ -44,20 +41,6 @@ class Hand:
         return self.num_cards < 2
 
     @property
-    def can_surrender(self):
-        if self.is_dealer:
-            return False
-        if self.surrendered or self.doubled or self.stand:
-            return False
-        return self.num_cards == 2 and self.deal.splits == 0
-
-    @property
-    def can_split(self):
-        if self.is_dealer:
-            return False
-        return self.is_pair and self
-
-    @property
     def can_double(self):
         if self.is_dealer:
             return False
@@ -70,6 +53,8 @@ class Hand:
     @property
     def can_hit(self):
         if self.is_dealer:
+            if self.can_turn:
+                return False
             if self.total <= 16:
                 return True
             if self.deal.rules.hit_soft_17 and self.total == 17 and self.is_soft:
@@ -80,30 +65,46 @@ class Hand:
         return True
 
     @property
+    def can_split(self):
+        if self.is_dealer:
+            return False
+        return self.is_pair and self
+
+    @property
     def can_stand(self):
         if self.is_dealer:
-            return not self.can_hit
+            return not self.can_turn and not self.can_hit
         if self.surrendered or self.doubled or self.stand:
             return False
         return True
 
     @property
+    def can_surrender(self):
+        if self.is_dealer:
+            return False
+        if self.surrendered or self.doubled or self.stand:
+            return False
+        return self.num_cards == 2 and self.deal.splits == 0
+
+    @property
+    def can_turn(self):
+        return self.is_dealer and self.counts[card_indexes['x']] > 0
+
+    @property
     def cards(self):
         # Shorthand representation for viewing
         cstr = ''
-        for i in [9, 0, 1, 2, 3, 4, 5, 6, 7, 8]:    # Sort Aces first, tens last, just for aesthetics
-            cstr += self.symbols[i] * int(self.counts[i])
+        for i in [9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10]:    # Sort Aces first, tens last, down card very last, just for aesthetics
+            cstr += card_symbols[i] * int(self.counts[i])
         return cstr
 
     @property
     def hard_total(self):
-        return sum([self.counts[i] * self.values[i] for i in self.indexes.values()])
+        return sum([self.counts[i] * card_values[i] for i in card_indexes.values()])
 
     @property
     def implied_name(self):
         mods = ''
-        if self.showing:
-            mods += self.showing
         if self.surrendered:
             mods += 'R'
         if self.doubled:
@@ -116,7 +117,7 @@ class Hand:
 
     @property
     def instreams(self):
-        return tuple(self.counts), self.showing, self.surrendered, self.doubled, self.stand
+        return tuple(self.counts), self.surrendered, self.doubled, self.stand
 
     @property
     def is_blackjack(self):
@@ -131,7 +132,7 @@ class Hand:
 
     @property
     def is_dealer(self):
-        return self.player == 'D'
+        return self.player == 'Dealer'
 
     @property
     def is_decided(self):
@@ -164,7 +165,9 @@ class Hand:
                 Hand(deal=self.deal, player=self.player, counts=tuple(counts))
             ]
         if card:
-            counts[self.indexes[card]] += 1
+            counts[card_indexes[card]] += 1
+            if card != 'x':
+                counts[card_indexes['x']] = 0
         sur = self.surrendered if surrendered is None else surrendered
         dbl = self.doubled if doubled is None else doubled
         std = self.stand if stand is None else stand
@@ -221,7 +224,7 @@ class Hand:
 
     @property
     def total(self):
-        if self.hard_total <= 11 and self.counts[self.indexes['A']] > 0:
+        if self.hard_total <= 11 and self.counts[card_indexes['A']] > 0:
             return self.hard_total + 10
         return self.hard_total
 
@@ -254,7 +257,7 @@ class Hand:
 
 
 if __name__ == '__main__':
-    # h = Hand(Rules(), 'P', cards='AT')
+    # h = Hand(Rules(), 'Player', cards='AT')
     # print(f'Hand:\n{h}')
     # print(f'Hand data:\n{h.state}')
     pass
