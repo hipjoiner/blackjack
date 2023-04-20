@@ -72,8 +72,6 @@ class Deal(metaclass=CachedInstance):
             dealer_hand=dealer_hand.instreams,
             player_hands=tuple(ph.instreams for ph in player_hands)
         )
-        if d.dealer.num_cards >= 2:
-            d.save()
         return d
 
     @cached_property
@@ -212,7 +210,7 @@ class Deal(metaclass=CachedInstance):
         return card_states
 
     def save(self):
-        data = self.state_for_json()
+        data = self.state_for_json
         # log(f'Saving {self.fpath}...')
         os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
         with open(self.fpath, 'w') as fp:
@@ -222,7 +220,7 @@ class Deal(metaclass=CachedInstance):
     def splits(self):
         return len(self.player) - 1
 
-    @property
+    @cached_property
     def state(self):
         result = {
             'summary': {
@@ -245,7 +243,12 @@ class Deal(metaclass=CachedInstance):
             result['valuation_recursive'] = vr
         return result
 
-    def state_for_json(self, data=None):
+    @cached_property
+    def state_for_json(self):
+        result = self.state_for_json_recursive(self.state)
+        return result
+
+    def state_for_json_recursive(self, data=None):
         if data is None:
             data = self.state
         mod_data = {}
@@ -253,7 +256,7 @@ class Deal(metaclass=CachedInstance):
             if isinstance(val, Deal):
                 mod_data[tag] = str(val)
             elif isinstance(val, dict):
-                mod_data[tag] = self.state_for_json(val)
+                mod_data[tag] = self.state_for_json_recursive(val)
             else:
                 mod_data[tag] = val
         return mod_data
@@ -277,11 +280,11 @@ class Deal(metaclass=CachedInstance):
         log(f'{self.implied_name} valuation_recursive...')
         # If I'm an end state, return my direct valuation
         if self.valuation is not None:
-            v = self.valuation
-            if 'hands' not in v:
-                x = 3
-            del v['hands']
             log(f'{self.implied_name} valuation_recursive OK')
+            v = {
+                'Summary': self.valuation
+            }
+            del v['Summary']['hands']
             return v
         # If I've previously saved my recursive valuation, load and use that
         # if os.path.isfile(self.fpath):
@@ -299,45 +302,30 @@ class Deal(metaclass=CachedInstance):
             'value': -99,
             'nodes': None,
         }
-        for action, action_data in self.next_states.items():  # No direct valuation => MUST have children states
-            if action in ['Surrender', 'Split']:
-                next_state = action_data
-                action_summary[action] = next_state.valuation_recursive()['Best']
-            elif action == 'Stand':
-                next_state = action_data
-                if next_state.next_player == 'Player':
-                    action_summary[action] = next_state.valuation_recursive()['Best']
-                else:
-                    action_summary[action] = next_state.valuation_recursive()
+        for action, state_data in self.next_states.items():  # No direct valuation => MUST have children states
+            if action in ['Surrender', 'Split', 'Stand']:
+                action_summary[action] = state_data.valuation_recursive()['Summary']
             elif action in ['Deal', 'Turn', 'Double', 'Hit']:
                 val_tot = 0
                 node_tot = 0
-                for card, card_data in action_data.items():
+                for card, card_data in state_data.items():
                     next_state = card_data['state']
-                    if next_state.next_player == 'Player':
-                        # if self.implied_name.endswith(' Tx A9T'):
-                        #     log(f'Printing valuation recursive for {next_state.implied_name}:')
-                        #     print(next_state.valuation_recursive())
-                        #     log(f'Printing next_states for {next_state.implied_name}:')
-                        #     print(next_state.next_states)
-                        sub_val = next_state.valuation_recursive()['Best']
-                    else:
-                        sub_val = next_state.valuation_recursive()
+                    sub_val = next_state.valuation_recursive()['Summary']
                     val_tot += card_data['prob'] * sub_val['value']
                     node_tot += sub_val['nodes']
                 action_summary[action] = {
                     'value': val_tot,
                     'nodes': node_tot,
                 }
+            else:
+                raise ValueError(f'Bad action "{action}"')
             if action_summary[action]['value'] > best_action['value']:
-                best_action['action'] = action
-                best_action['value'] = action_summary[action]['value']
-                best_action['nodes'] = action_summary[action]['nodes']
-        if self.next_player == 'Dealer':
-            action_summary = best_action
-        else:
-            action_summary['Best'] = best_action
-        # FIXME: Once having computed a recursive valuation, I should save it (subject to number of nodes underneath)
+                best_action = {
+                    'action': action,
+                    'value': action_summary[action]['value'],
+                    'nodes': action_summary[action]['nodes'],
+                }
+        action_summary['Summary'] = best_action
         log(f'{self.implied_name} valuation_recursive OK')
         return action_summary
 
@@ -348,4 +336,5 @@ if __name__ == '__main__':
     # deal = Deal.from_cards('A5TT')
     # deal = Deal.from_cards('ATT')
     deal = Deal.from_cards('9TT')
-    deal.save()
+    vr = deal.valuation_recursive()
+    print(vr)
