@@ -31,9 +31,11 @@ class Shoe:
         outs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         for i, count in enumerate(self.deal.dealer.counts):
             outs[i] += count
-        for h in self.deal.player:
-            for i, count in enumerate(h.counts):
-                outs[i] += count
+        for i, count in enumerate(self.deal.player.counts):
+            outs[i] += count
+        if self.deal.player.split_card:
+            i = card_indexes[self.deal.player.split_card]
+            outs[i] += self.deal.player.split_count
         outs[10] = 0        # By convention, there are never any Unknown (x) cards out, or in the shoe
         return outs
 

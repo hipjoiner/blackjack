@@ -10,18 +10,18 @@ from shoe import Shoe
 
 
 class Deal(metaclass=CachedInstance):
-    node_threshold = 300
+    node_threshold = 100
 
     def __init__(
         self,
         rules=(1.5, 6, False, 'Any2', 3, True, True, True),
-        dealer_hand=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, False, False),
-        player_hands=(((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, False, False),)
+        dealer=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
+        player=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
     ):
         self.rules = Rules(*rules)
         self.shoe = Shoe(self)
-        self.dealer = Hand(self, 'Dealer', *dealer_hand)
-        self.player = sorted([Hand(self, 'Player', *ph) for ph in player_hands])
+        self.dealer = Hand(self, 'Dealer', *dealer)
+        self.player = Hand(self, 'Player', *player)
 
     def __repr__(self):
         return self.implied_name
@@ -40,7 +40,7 @@ class Deal(metaclass=CachedInstance):
 
     @property
     def implied_name(self):
-        return f'{self.rules.implied_name} [{str(self.dealer)}] {" ".join(str(h) for h in self.player)}'
+        return f'{self.rules.implied_name} [{str(self.dealer)}] {str(self.player)}'
 
     @property
     def is_done(self):
@@ -53,28 +53,17 @@ class Deal(metaclass=CachedInstance):
             contents = json.load(fp)
         return contents['deal']
 
-    def new_deal(self, card='', surrendered=None, doubled=None, stand=None, split=False):
+    def new_deal(self, card='', surrendered=None, split=False, doubled=None, stand=None):
         """Instantiate a child state from this one, with modifications as specified in args."""
-        dealer_hand = self.dealer
-        player_hands = self.player.copy()
-        old_hand = self.next_hand
-        sur = old_hand.surrendered if surrendered is None else surrendered
-        dbl = old_hand.doubled if doubled is None else doubled
-        std = old_hand.stand if stand is None else stand
-        new_hand = self.next_hand.new_hand(card=card, surrendered=sur, doubled=dbl, stand=std, split=split)
+        current_hand = self.next_hand
+        sur = current_hand.surrendered if surrendered is None else surrendered
+        dbl = current_hand.doubled if doubled is None else doubled
+        std = current_hand.stand if stand is None else stand
+        new_hand = current_hand.new_hand(card=card, surrendered=sur, split=split, doubled=dbl, stand=std)
         if self.next_player == 'Dealer':
-            dealer_hand = new_hand
+            d = Deal(rules=self.rules.instreams, dealer=new_hand.instreams, player=self.player.instreams)
         else:
-            if split:
-                player_hands[self.next_hand_index] = new_hand[0]
-                player_hands.append(new_hand[1])
-            else:
-                player_hands[self.next_hand_index] = new_hand
-        d = Deal(
-            rules=self.rules.instreams,
-            dealer_hand=dealer_hand.instreams,
-            player_hands=tuple(ph.instreams for ph in player_hands)
-        )
+            d = Deal(rules=self.rules.instreams, dealer=self.dealer.instreams, player=new_hand.instreams)
         log_occasional(d)
         return d
 
@@ -91,15 +80,7 @@ class Deal(metaclass=CachedInstance):
         elif self.next_player == 'Dealer':
             return self.dealer
         else:
-            return self.player[self.next_hand_index]
-
-    @cached_property
-    def next_hand_index(self):
-        if self.next_player != 'Player':
-            return None
-        for i, h in enumerate(self.player):
-            if not h.is_done:
-                return i
+            return self.player
 
     @cached_property
     def next_is_down_card_deal(self):
@@ -110,35 +91,27 @@ class Deal(metaclass=CachedInstance):
         result = self.next_actions == ['Turn']
         return result
 
-    @cached_property
+    @property
     def next_player(self):
         # Deal phase
-        if self.player[0].num_cards == 0:
+        if self.player.num_cards == 0:
             return 'Player'
         if self.dealer.num_cards == 0:
             return 'Dealer'
-        if self.player[0].num_cards == 1:
+        if self.player.num_cards == 1:
             return 'Player'
         if self.dealer.num_cards == 1:
             return 'Dealer'
-
-        # Check for Blackjacks phase
+        # Check for Blackjacks
         if self.dealer.is_blackjack:
             return None
-        if self.player[0].is_blackjack:
+        if self.player.is_blackjack:
             return None
-
-        # If player all busted, dealer doesn't play
-        player_all_busted = True
-        for h in self.player:
-            if not h.is_busted and not h.surrendered:
-                player_all_busted = False
-        if player_all_busted:
+        # If player busted or surrendered, dealer doesn't play
+        if self.player.is_busted or self.player.surrendered:
             return None
-
-        for h in self.player:
-            if not h.is_done:
-                return 'Player'
+        if not self.player.is_done:
+            return 'Player'
         if not self.dealer.is_done:
             return 'Dealer'
         return None
@@ -236,20 +209,15 @@ class Deal(metaclass=CachedInstance):
         with open(self.fpath, 'w') as fp:
             json.dump(data, fp, indent=4)
 
-    @property
-    def splits(self):
-        return len(self.player) - 1
-
     @cached_property
     def state(self):
         result = {
             'summary': {
                 'state': self.implied_name,
                 'to_play': self.next_player,
-                'hand_index': self.next_hand_index,
             },
             'children': self.next_states,
-            'player': [h.state for h in self.player],
+            'player': self.player.state,
             'dealer': self.dealer.state,
             'rules': self.rules.implied_name,
             'shoe': {
@@ -280,21 +248,11 @@ class Deal(metaclass=CachedInstance):
 
     @cached_property
     def valuation_leaf(self):
-        """If all hands in this state are terminal and the outcome of all can be determined,
-            compute the total bet value returned to Player of all hands, and return.
-            Otherwise, return None.
-        """
-        val = {
-            'value': 0,
-            'nodes': 1,
-            'hands': [],
-        }
-        for h in self.player:
-            if h.valuation_leaf is None:
-                return None
-            val['hands'].append(h.valuation_leaf)
-            val['value'] += h.valuation_leaf['value']
-        return val
+        v = self.player.valuation_leaf
+        if v is None:
+            return None
+        v['nodes'] = 1
+        return v
 
     @cached_property
     def valuation(self):
@@ -358,7 +316,7 @@ class Deal(metaclass=CachedInstance):
 
 
 if __name__ == '__main__':
-    cards = '9T'
+    cards = '9T9'
     if len(sys.argv) > 1:
         cards = sys.argv[1]
     deal = Deal.from_cards(cards=cards)
