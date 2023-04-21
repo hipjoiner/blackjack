@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from inspect import signature
 
 
@@ -45,3 +45,12 @@ class CachedInstance(type):
 def log(txt):
     now = datetime.now()
     print(f'{now.strftime("%Y-%m-%d %H:%M:%S")} {txt}')
+
+
+def log_occasional(txt, seconds=3):
+    now = datetime.now()
+    if not hasattr(log_occasional, 'last_time'):
+        log_occasional.last_time = now - timedelta(days=1)
+    if now > log_occasional.last_time + timedelta(seconds=seconds):
+        log(txt)
+        log_occasional.last_time = now

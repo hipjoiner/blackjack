@@ -1,5 +1,3 @@
-import numpy as np
-
 from config import card_symbols, card_indexes
 
 
@@ -30,19 +28,21 @@ class Shoe:
 
     @property
     def cards_out(self):
-        outs = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-        outs += self.deal.dealer.counts
+        outs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        for i, count in enumerate(self.deal.dealer.counts):
+            outs[i] += count
         for h in self.deal.player:
-            outs += h.counts
-        # FIXME: Is this math exactly correct for cases where Dealer does actually have a down card?
-        # If he does, with A showing, then there is really some non-T card out, which impacts probabilities
+            for i, count in enumerate(h.counts):
+                outs[i] += count
         outs[10] = 0        # By convention, there are never any Unknown (x) cards out, or in the shoe
         return outs
 
     @property
     def counts(self):
-        c = self.base_counts - self.cards_out
-        return c.tolist()
+        c = self.base_counts.copy()
+        for i, count in enumerate(self.cards_out):
+            c[i] -= count
+        return c
 
     @property
     def num_cards(self):

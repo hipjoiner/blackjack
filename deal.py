@@ -1,14 +1,17 @@
 from functools import cache, cached_property
 import json
 import os
+import sys
 
-from config import CachedInstance, home_dir, log
+from config import CachedInstance, home_dir, log, log_occasional
 from hand import Hand
 from rules import Rules
 from shoe import Shoe
 
 
 class Deal(metaclass=CachedInstance):
+    node_threshold = 300
+
     def __init__(
         self,
         rules=(1.5, 6, False, 'Any2', 3, True, True, True),
@@ -18,8 +21,7 @@ class Deal(metaclass=CachedInstance):
         self.rules = Rules(*rules)
         self.shoe = Shoe(self)
         self.dealer = Hand(self, 'Dealer', *dealer_hand)
-        self.player = [Hand(self, 'Player', *ph) for ph in player_hands]
-        # log(f'{self.implied_name}...')
+        self.player = sorted([Hand(self, 'Player', *ph) for ph in player_hands])
 
     def __repr__(self):
         return self.implied_name
@@ -38,7 +40,7 @@ class Deal(metaclass=CachedInstance):
 
     @property
     def implied_name(self):
-        return f'{self.rules.implied_name} {str(self.dealer)} {" ".join(str(h) for h in self.player)}'
+        return f'{self.rules.implied_name} [{str(self.dealer)}] {" ".join(str(h) for h in self.player)}'
 
     @property
     def is_done(self):
@@ -52,6 +54,7 @@ class Deal(metaclass=CachedInstance):
         return contents['deal']
 
     def new_deal(self, card='', surrendered=None, doubled=None, stand=None, split=False):
+        """Instantiate a child state from this one, with modifications as specified in args."""
         dealer_hand = self.dealer
         player_hands = self.player.copy()
         old_hand = self.next_hand
@@ -72,6 +75,7 @@ class Deal(metaclass=CachedInstance):
             dealer_hand=dealer_hand.instreams,
             player_hands=tuple(ph.instreams for ph in player_hands)
         )
+        log_occasional(d)
         return d
 
     @cached_property
@@ -150,15 +154,30 @@ class Deal(metaclass=CachedInstance):
             elif action == 'Turn':
                 result['Turn'] = self.next_states_adding_card()
             elif action == 'Surrender':
-                result['Surrender'] = self.new_deal(surrendered=True)
+                result['Surrender'] = {
+                    '<no card>': {
+                        'state': self.new_deal(surrendered=True),
+                        'prob': 1.0,
+                    }
+                }
             elif action == 'Split':
-                result['Split'] = self.new_deal(split=True)
+                result['Split'] = {
+                    '<no card>': {
+                        'state': self.new_deal(split=True),
+                        'prob': 1.0,
+                    }
+                }
             elif action == 'Double':
                 result['Double'] = self.next_states_adding_card(doubled=True)
             elif action == 'Hit':
                 result['Hit'] = self.next_states_adding_card()
             elif action == 'Stand':
-                result['Stand'] = self.new_deal(stand=True)
+                result['Stand'] = {
+                    '<no card>': {
+                        'state': self.new_deal(stand=True),
+                        'prob': 1.0,
+                    }
+                }
             else:
                 raise ValueError(f'Bad action "{action}"')
         return result
@@ -209,9 +228,10 @@ class Deal(metaclass=CachedInstance):
             }
         return card_states
 
-    def save(self):
+    def save(self, save_valuation=False):
         data = self.state_for_json
-        # log(f'Saving {self.fpath}...')
+        if save_valuation:
+            data['valuation'] = self.valuation
         os.makedirs(os.path.dirname(self.fpath), exist_ok=True)
         with open(self.fpath, 'w') as fp:
             json.dump(data, fp, indent=4)
@@ -236,11 +256,8 @@ class Deal(metaclass=CachedInstance):
                 'cards': self.shoe.cards,
                 'pdf': self.shoe.pdf,
             },
-            'valuation': self.valuation,
+            'valuation_leaf': self.valuation_leaf,
         }
-        vr = self.valuation_recursive()
-        if vr is not None:
-            result['valuation_recursive'] = vr
         return result
 
     @cached_property
@@ -261,80 +278,88 @@ class Deal(metaclass=CachedInstance):
                 mod_data[tag] = val
         return mod_data
 
-    @property
-    def valuation(self):
+    @cached_property
+    def valuation_leaf(self):
+        """If all hands in this state are terminal and the outcome of all can be determined,
+            compute the total bet value returned to Player of all hands, and return.
+            Otherwise, return None.
+        """
         val = {
             'value': 0,
             'nodes': 1,
             'hands': [],
         }
         for h in self.player:
-            if h.valuation is None:
+            if h.valuation_leaf is None:
                 return None
-            val['hands'].append(h.valuation)
-            val['value'] += h.valuation['value']
+            val['hands'].append(h.valuation_leaf)
+            val['value'] += h.valuation_leaf['value']
         return val
 
-    @cache
-    def valuation_recursive(self):
-        log(f'{self.implied_name} valuation_recursive...')
-        # If I'm an end state, return my direct valuation
-        if self.valuation is not None:
-            log(f'{self.implied_name} valuation_recursive OK')
-            v = {
-                'Summary': self.valuation
-            }
-            del v['Summary']['hands']
-            return v
-        # If I've previously saved my recursive valuation, load and use that
-        # if os.path.isfile(self.fpath):
-        #     with open(self.fpath, 'r') as fp:
-        #         saved_data = json.load(fp)
-        #     if 'valuation_recursive' in saved_data:
-        #         return saved_data['valuation_recursive']
-        """Compute me recursively from child states. This will involve:
-            At action levels, choosing the highest-value action and noting it and its value
-            At card pdf levels, computing a weighted average value based on probabilities
+    @cached_property
+    def valuation(self):
+        """Compute value to Player, and number of child nodes, recursively.
+            If I have a leaf value, return that value (1 node).
+            If no leaf value, I must have child states:
+                At action levels, choose highest-value action, noting its value and node count
+                At card pdf levels, compute a weighted average value based on probabilities of each card
+                    and value of resulting state
         """
-        action_summary = {}
+        # log(f'{self.implied_name} valuation...')
+        if self.valuation_leaf is not None:
+            # log(f'{self.implied_name} valuation OK')
+            return {'Summary': self.valuation_leaf}
+        result = {}
         best_action = {
-            'action': None,
             'value': -99,
             'nodes': None,
         }
-        for action, state_data in self.next_states.items():  # No direct valuation => MUST have children states
-            if action in ['Surrender', 'Split', 'Stand']:
-                action_summary[action] = state_data.valuation_recursive()['Summary']
-            elif action in ['Deal', 'Turn', 'Double', 'Hit']:
-                val_tot = 0
-                node_tot = 0
-                for card, card_data in state_data.items():
-                    next_state = card_data['state']
-                    sub_val = next_state.valuation_recursive()['Summary']
-                    val_tot += card_data['prob'] * sub_val['value']
-                    node_tot += sub_val['nodes']
-                action_summary[action] = {
-                    'value': val_tot,
-                    'nodes': node_tot,
-                }
-            else:
-                raise ValueError(f'Bad action "{action}"')
-            if action_summary[action]['value'] > best_action['value']:
-                best_action = {
-                    'action': action,
-                    'value': action_summary[action]['value'],
-                    'nodes': action_summary[action]['nodes'],
-                }
-        action_summary['Summary'] = best_action
-        log(f'{self.implied_name} valuation_recursive OK')
-        return action_summary
+        for action, state_data in self.next_states.items():
+            val_tot = 0
+            node_tot = 0
+            for card, card_data in state_data.items():
+                child_state = card_data['state']
+
+                """If child has valuation already saved to disk, retrieve and use that instead."""
+                child_val_cached = child_state.valuation_saved
+                if child_val_cached is not None:
+                    log(f'Using cached valuation for {child_state.implied_name}...')
+                    child_val = child_val_cached
+                else:
+                    child_val = child_state.valuation['Summary']
+
+                val_tot += card_data['prob'] * child_val['value']
+                node_tot += child_val['nodes']
+
+                """Cache valuations with lots of nodes for later retrieval"""
+                if child_val['nodes'] >= self.node_threshold and not child_val_cached:
+                    log(f'Saving computed valuation for {child_state.implied_name} ({child_val["nodes"]} nodes)...')
+                    child_state.save(save_valuation=True)
+
+            result[action] = {
+                'value': val_tot,
+                'nodes': node_tot,
+            }
+            if result[action]['value'] > best_action['value']:
+                best_action = result[action]
+        result['Summary'] = best_action
+        # log(f'{self.implied_name} valuation OK')
+        return result
+
+    @property
+    def valuation_saved(self):
+        # If I previously saved valuation, load and use that
+        if os.path.isfile(self.fpath):
+            with open(self.fpath, 'r') as fp:
+                saved_data = json.load(fp)
+            if 'valuation' in saved_data:
+                return saved_data['valuation']['Summary']
+        return None
 
 
 if __name__ == '__main__':
-    # deal = Deal.from_cards('9TTT')
-    # deal = Deal.from_cards('TTTT')
-    # deal = Deal.from_cards('A5TT')
-    # deal = Deal.from_cards('ATT')
-    deal = Deal.from_cards('9TT')
-    vr = deal.valuation_recursive()
-    print(vr)
+    cards = '9T'
+    if len(sys.argv) > 1:
+        cards = sys.argv[1]
+    deal = Deal.from_cards(cards=cards)
+    deal.save(save_valuation=True)

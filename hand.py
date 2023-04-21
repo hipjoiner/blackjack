@@ -10,6 +10,9 @@ class Hand:
         self.doubled = doubled
         self.stand = stand
 
+    def __lt__(self, other):
+        return self.implied_name < other.implied_name
+
     def __str__(self):
         return self.implied_name
 
@@ -48,6 +51,10 @@ class Hand:
             return False
         if self.num_cards != 2:
             return False
+        if self.hard_total > 11:    # For efficiency, don't let Player do something this stupid
+            return False
+        if self.total > 19:         # For efficiency, don't let Player do something this stupid
+            return False
         return True
 
     @property
@@ -62,13 +69,17 @@ class Hand:
             return False
         if self.surrendered or self.doubled or self.stand:
             return False
+        if self.hard_total >= 17:   # For efficiency, don't let Player do something this stupid
+            return False
+        if self.total >= 19:        # For efficiency, don't let Player do something this stupid
+            return False
         return True
 
     @property
     def can_split(self):
         if self.is_dealer:
             return False
-        return self.is_pair and self
+        return self.is_pair and self.deal.splits < self.deal.rules.splits_allowed
 
     @property
     def can_stand(self):
@@ -83,6 +94,8 @@ class Hand:
         if self.is_dealer:
             return False
         if self.surrendered or self.doubled or self.stand:
+            return False
+        if self.total < 12:         # For efficiency, don't let Player do something this stupid
             return False
         return self.num_cards == 2 and self.deal.splits == 0
 
@@ -112,8 +125,8 @@ class Hand:
         if self.stand:
             mods += 'S'
         if mods:
-            mods += '^'
-        return mods + self.cards
+            return self.cards + '^' + mods
+        return self.cards
 
     @property
     def instreams(self):
@@ -224,12 +237,16 @@ class Hand:
 
     @property
     def total(self):
+        """Compute the best point total for the hand."""
         if self.hard_total <= 11 and self.counts[card_indexes['A']] > 0:
             return self.hard_total + 10
         return self.hard_total
 
     @property
-    def valuation(self):
+    def valuation_leaf(self):
+        """If this hand is terminal and outcome can be known, then return the outcome and bet value.
+            Otherwise, return nothing.
+        """
         if self.value is None:
             return None
         return {
@@ -239,6 +256,7 @@ class Hand:
 
     @property
     def value(self):
+        """If this hand is terminal and outcome can be known, compute the bet return to the Player."""
         if self.outcome is None:
             return None
         if self.outcome == 'Blackjack':
