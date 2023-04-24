@@ -1,6 +1,16 @@
 class Rules:
-    def __init__(self, blackjack_pays, shoe_decks, hit_soft_17, double_allowed, splits_allowed, double_after_split, resplit_aces, late_surrender):
-        self.blackjack_pays =  blackjack_pays
+    def __init__(
+        self,
+        blackjack_pays=1.5,
+        shoe_decks=6,
+        hit_soft_17=False,
+        double_allowed='Any2',
+        splits_allowed=3,
+        double_after_split=True,
+        resplit_aces=False,
+        late_surrender=True,
+    ):
+        self.blackjack_pays = blackjack_pays
         self.shoe_decks = shoe_decks
         self.hit_soft_17 = hit_soft_17
         self.double_allowed = double_allowed

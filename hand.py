@@ -65,9 +65,10 @@ class Hand:
             return False
         if self.split_count > 0 and not self.deal.rules.double_after_split:
             return False
-        if self.hard_total > 11:    # For efficiency, don't let Player do something this stupid
+        # For efficiency, never let anyone (i.e., Player) do anything as stupid as the below
+        if self.hard_total >= 13:
             return False
-        if self.total > 19:         # For efficiency, don't let Player do something this stupid
+        if self.total >= 20:
             return False
         return True
 
@@ -83,9 +84,12 @@ class Hand:
             return False
         if self.surrendered or self.doubled or self.stand:
             return False
-        if self.hard_total >= 17:   # For efficiency, don't let Player do something this stupid
+        if self.split_count > 0 and self.split_card == 'A':
             return False
-        if self.total >= 19:        # For efficiency, don't let Player do something this stupid
+        # For efficiency, never let anyone (i.e., Player) do anything as stupid as the below
+        if self.hard_total >= 18:
+            return False
+        if self.total >= 20:
             return False
         return True
 

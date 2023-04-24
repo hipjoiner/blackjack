@@ -3,14 +3,15 @@ import json
 import os
 import sys
 
-from config import CachedInstance, home_dir, log, log_occasional
+from config import home_dir, log, log_occasional
+from node import Node
 from hand import Hand
 from rules import Rules
 from shoe import Shoe
 
 
-class Deal(metaclass=CachedInstance):
-    node_threshold = 100
+class Deal(Node):
+    node_threshold = 25000
 
     def __init__(
         self,
@@ -28,6 +29,8 @@ class Deal(metaclass=CachedInstance):
 
     @property
     def fpath(self):
+        if self.dealer.num_cards >= 1:
+            return f'{home_dir}/states/{self.dealer.cards}/{self.implied_name}.json'
         return f'{home_dir}/states/{self.implied_name}.json'
 
     @staticmethod
@@ -125,6 +128,8 @@ class Deal(metaclass=CachedInstance):
             if action == 'Deal':
                 result['Deal'] = self.next_states_adding_card()
             elif action == 'Turn':
+                if not self.player.is_done:
+                    raise ValueError(f'Bad state ordering: {self.implied_name}')
                 result['Turn'] = self.next_states_adding_card()
             elif action == 'Surrender':
                 result['Surrender'] = {
@@ -180,6 +185,10 @@ class Deal(metaclass=CachedInstance):
                     'T': pdf['T'],
                     'x': 1 - pdf['T'],
                 }
+            else:
+                pdf = {
+                    'x': 1.0,
+                }
         elif self.next_is_down_card_turn:
             if self.dealer.cards[0] == 'T':
                 # If up card is a T and we're still playing, down card can't be an A.
@@ -191,6 +200,8 @@ class Deal(metaclass=CachedInstance):
                 adj_factor = pdf['T']
                 pdf = {c: p / (1 - adj_factor) for c, p in pdf.items()}
                 del pdf['T']
+            else:
+                pass    # Shoe pdf is correct; no reweighting required
         for card, prob in pdf.items():
             if prob <= 0:
                 continue
@@ -266,12 +277,8 @@ class Deal(metaclass=CachedInstance):
         # log(f'{self.implied_name} valuation...')
         if self.valuation_leaf is not None:
             # log(f'{self.implied_name} valuation OK')
-            return {'Summary': self.valuation_leaf}
-        result = {}
-        best_action = {
-            'value': -99,
-            'nodes': None,
-        }
+            return [self.valuation_leaf]
+        results = []
         for action, state_data in self.next_states.items():
             val_tot = 0
             node_tot = 0
@@ -284,39 +291,53 @@ class Deal(metaclass=CachedInstance):
                     log(f'Using cached valuation for {child_state.implied_name}...')
                     child_val = child_val_cached
                 else:
-                    child_val = child_state.valuation['Summary']
+                    child_val = child_state.valuation
 
-                val_tot += card_data['prob'] * child_val['value']
-                node_tot += child_val['nodes']
+                val_tot += card_data['prob'] * child_val[0]['value']
+                node_tot += child_val[0]['nodes']
 
                 """Cache valuations with lots of nodes for later retrieval"""
-                if child_val['nodes'] >= self.node_threshold and not child_val_cached:
-                    log(f'Saving computed valuation for {child_state.implied_name} ({child_val["nodes"]} nodes)...')
-                    child_state.save(save_valuation=True)
-
-            result[action] = {
+                if not child_val_cached:
+                    if child_val[0]['nodes'] >= self.node_threshold:
+                        log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
+                        child_state.save(save_valuation=True)
+                        child_state.clear()
+                    # We care particularly about starting hands
+                    elif child_state.player.num_cards <= 2 and not (
+                        child_state.player.surrendered or
+                        child_state.player.doubled or
+                        child_state.player.stand
+                    ):
+                        log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
+                        child_state.save(save_valuation=True)
+                        child_state.clear()
+            result = {
+                'action': action,
                 'value': val_tot,
                 'nodes': node_tot,
             }
-            if result[action]['value'] > best_action['value']:
-                best_action = result[action]
-        result['Summary'] = best_action
+            results.append(result)
+        results = sorted(results, key=lambda r: r['value'], reverse=True)
         # log(f'{self.implied_name} valuation OK')
-        return result
+        return results
 
     @property
     def valuation_saved(self):
         # If I previously saved valuation, load and use that
         if os.path.isfile(self.fpath):
-            with open(self.fpath, 'r') as fp:
-                saved_data = json.load(fp)
+            try:
+                with open(self.fpath, 'r') as fp:
+                    saved_data = json.load(fp)
+            except json.decoder.JSONDecodeError as e:
+                log(f'ERROR: {self.fpath} failed to load')
+                raise e
             if 'valuation' in saved_data:
-                return saved_data['valuation']['Summary']
+                return saved_data['valuation']
         return None
 
 
 if __name__ == '__main__':
-    cards = '9T9'
+    cards = ''
     if len(sys.argv) > 1:
         cards = sys.argv[1]
     deal = Deal.from_cards(cards=cards)
