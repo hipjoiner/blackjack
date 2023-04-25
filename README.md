@@ -1,6 +1,15 @@
 # Blackjack
 Goal: compute exact expected values for Blackjack play
 
+
+TO DO T 25Apr23:
+* Continue work on summary output (to spreadsheet)
+  * Add starting hand probabilities 
+  * Find starting hands with sensitivity to action or count
+* Figure out memory cleanup, to enable unattended runs
+* Figure out computation & storage for shoes with altered counts
+
+------------------------------------------------------------------------------------------------------------------------
 Hand play sequence
 
 1. Bettor card 1
@@ -22,15 +31,6 @@ Are no more cards needed?
 If true, compute EV.
 If not, construct subsequent states.
 
-Actions
-    Insurance   I
-    Surrender   S
-    Split       V
-    Double      D
-    Hit         H
-    Stand       X
-
-
 ------------------------------------------------------------------------------------------------------------------------
 Table state
     Decks                           6D/8D/1D/2D/4D
@@ -40,49 +40,29 @@ Table state
     Split hands                     S0/S1/S2/S3
     Resplit Aces allowed            RSA/NRSA
     Surrender allowed               S/NS
-
-    T 6D-S17-DAS-D2-S3-RSA-S
-
+e.g.
+    BJ-6D-S17-DAS-D2-S3-RSA-S
 
 ------------------------------------------------------------------------------------------------------------------------
 Player state representation
-                                    2-3-4-5-6-7-8-9-T-A
-    Cards                           0-0-0-0-0-0-0-0-0-0     Ten-value array showing number of cards of each rank
-    Insurance taken                 I                       Insurance, surrender and split modify the overall round
+    Cards internal                  Ten-value array showing number of cards of each rank
+    Cards for display               Sorted list (A first, T last)
     Surrendered                     R
-    Split                           Sn
-
-    Double                          D                       Double modifies each individual (possibly split) hand
-
-
-    P D^1-0-0-0-0-1-0-1-0-0
-
-Player dealt 9 and 2, doubled, subsequently dealt a 7
-OR
-Player dealt 7 and 2, doubled, subsequently dealt a 9
-
-Split representation
-    P <hand-1-state> [<hand-2-state>]...
-    Sort hand states alphabetically to reduce number of permutations
-
-    P S2 D^1-0-0-0-0-1-0-1-0-0 ^1-0-0-1-0-0-0-0-1-0
-
-Dealt pair of 2s; split. First hand dealt 9 (or 7), doubled, got 7 (or 9). Second hand dealt 5 and T (order unknown).
-
+    Split                           Vcxn        c is card of split; n is number of times split (typically 1-3)
+    Double                          D
+e.g.
+    A35^D
 
 ------------------------------------------------------------------------------------------------------------------------
 Dealer state representation
-    Up card                         2/3/4/5/6/7/8/9/T/A
-    Cards                           0-0-0-0-0-0-0-0-0-0     Ten-value array showing number of cards of each rank
-    Insurance offered               I
-
-    D 4^1-0-0-0-0-0-1-0-0-0
-    D I A^0-0-0-0-0-0-0-0-1-1
-
+    Cards internal                  Ten-value array showing number of cards of each rank
+    Cards for display               Sorted list, A first, T 2nd last, x for down card last
+e.g.
+    [9x]
 
 ------------------------------------------------------------------------------------------------------------------------
 Full state representation
-    <table state> # <dealer state> # <player state>
-
-    T 6D-S17-DAS-D2-S3-RSA-S # D 4^1-0-0-0-0-0-1-0-0-0 # P S2 D^1-0-0-0-0-1-0-1-0-0 ^1-0-0-1-0-0-0-0-1-0
+    <table state> <dealer state> <player state>
+e.g.
+    BJ-6D-S17-DAS-D2-S3-RSA-S [6x] 38^V8x2
 

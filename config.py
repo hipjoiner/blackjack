@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from inspect import signature
+import pandas as pd
 
 
 home_dir = 'C:/Users/John/blackjack'
@@ -54,3 +55,11 @@ def log_occasional(txt, seconds=3):
     if now > log_occasional.last_time + timedelta(seconds=seconds):
         log(txt)
         log_occasional.last_time = now
+
+
+def pandas_format():
+    pd.options.display.max_columns = 999
+    pd.options.display.max_colwidth = 999
+    pd.options.display.max_rows = 9999
+    pd.options.display.width = 9999
+
