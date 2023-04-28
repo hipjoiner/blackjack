@@ -4,10 +4,16 @@ Goal: compute exact expected values for Blackjack play
 
 TO DO T 25Apr23:
 * Continue work on summary output (to spreadsheet)
-  * Add starting hand probabilities 
-  * Find starting hands with sensitivity to action or count
+  * Produce a Basic Strategy replication
+  * Produce similar format for action delta table
+  * Produce similar format for EV table, with total (house/player edge)
 * Figure out memory cleanup, to enable unattended runs
+  * Enable trace of Deal instantiation & cleanup
+  * Trace Hand instantiation & cleanup
 * Figure out computation & storage for shoes with altered counts
+  * Add instantiation arg for true count (default 0)
+  * Add to file signature, "TC3" or "TC-2", after rules but before dealer hand
+  * Fix fpath for hands w/ more than 2 cards
 
 ------------------------------------------------------------------------------------------------------------------------
 Hand play sequence

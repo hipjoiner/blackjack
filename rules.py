@@ -19,6 +19,9 @@ class Rules:
         self.resplit_aces = resplit_aces
         self.late_surrender = late_surrender
 
+    def __str__(self):
+        return self.implied_name
+
     @property
     def implied_name(self):
         rules = [

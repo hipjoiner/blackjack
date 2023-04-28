@@ -3,7 +3,7 @@ import json
 import os
 import sys
 
-from config import home_dir, log, log_occasional
+from config import home_dir, log, log_occasional, show_deal_refs
 from node import Node
 from hand import Hand
 from rules import Rules
@@ -11,7 +11,7 @@ from shoe import Shoe
 
 
 class Deal(Node):
-    node_threshold = 25000
+    node_threshold = 15000
 
     def __init__(
         self,
@@ -27,11 +27,23 @@ class Deal(Node):
     def __repr__(self):
         return self.implied_name
 
+    def clear(self):
+        # Blow this object completely out of memory
+        self.player = None
+        self.dealer = None
+        self.shoe = None
+        # self.rules = None
+        super().clear()
+        Node.pop_reference(self)
+
     @property
     def fpath(self):
-        if self.dealer.num_cards >= 1:
-            return f'{home_dir}/states/{self.dealer.cards}/{self.implied_name}.json'
-        return f'{home_dir}/states/{self.implied_name}.json'
+        rule_dir = str(self.rules)
+        count_dir = f'TC{self.shoe.true_count}'
+        cards_dir = self.dealer.cards[:2]
+        if self.dealer.num_cards > 0:
+            return f'{home_dir}/states/{rule_dir}/{count_dir}/{cards_dir}/{self.implied_name}.json'
+        return f'{home_dir}/states/{rule_dir}/{count_dir}/{self.implied_name}.json'
 
     @staticmethod
     def from_cards(cards):
@@ -67,7 +79,7 @@ class Deal(Node):
             d = Deal(rules=self.rules.instreams, dealer=new_hand.instreams, player=self.player.instreams)
         else:
             d = Deal(rules=self.rules.instreams, dealer=self.dealer.instreams, player=new_hand.instreams)
-        log_occasional(d)
+        # log_occasional(d)
         return d
 
     @cached_property
@@ -274,7 +286,6 @@ class Deal(Node):
                 At card pdf levels, compute a weighted average value based on probabilities of each card
                     and value of resulting state
         """
-        # log(f'{self.implied_name} valuation...')
         if self.valuation_leaf is not None:
             # log(f'{self.implied_name} valuation OK')
             return [self.valuation_leaf]
@@ -292,16 +303,10 @@ class Deal(Node):
                     child_val = child_val_cached
                 else:
                     child_val = child_state.valuation
-
-                val_tot += card_data['prob'] * child_val[0]['value']
-                node_tot += child_val[0]['nodes']
-
-                """Cache valuations with lots of nodes for later retrieval"""
-                if not child_val_cached:
+                    """Cache valuations with lots of nodes for later retrieval"""
                     if child_val[0]['nodes'] >= self.node_threshold:
                         log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
                         child_state.save(save_valuation=True)
-                        child_state.clear()
                     # We care particularly about starting hands
                     elif child_state.player.num_cards <= 2 and not (
                         child_state.player.surrendered or
@@ -310,7 +315,13 @@ class Deal(Node):
                     ):
                         log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
                         child_state.save(save_valuation=True)
-                        child_state.clear()
+                    # Once child states have been used, clear them from memory
+                    child_state.clear()
+                    Node.pop_reference(child_state)
+
+                val_tot += card_data['prob'] * child_val[0]['value']
+                node_tot += child_val[0]['nodes']
+
             result = {
                 'action': action,
                 'value': val_tot,
@@ -318,7 +329,8 @@ class Deal(Node):
             }
             results.append(result)
         results = sorted(results, key=lambda r: r['value'], reverse=True)
-        # log(f'{self.implied_name} valuation OK')
+        self.invalidate('next_states')
+        log_occasional(f'Deal instances in cache: {len(self.__class__._instances)}', seconds=10)
         return results
 
     @property
@@ -337,8 +349,4 @@ class Deal(Node):
 
 
 if __name__ == '__main__':
-    cards = ''
-    if len(sys.argv) > 1:
-        cards = sys.argv[1]
-    deal = Deal.from_cards(cards=cards)
-    deal.save(save_valuation=True)
+    pass
