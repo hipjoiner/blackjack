@@ -1,4 +1,5 @@
 from functools import cache, cached_property
+import gc
 import json
 import os
 import sys
@@ -11,28 +12,35 @@ from shoe import Shoe
 
 
 class Deal(Node):
-    node_threshold = 15000
+    node_save_threshold = 25000
+    cache_limit = 4000000
 
     def __init__(
         self,
         rules=(1.5, 6, False, 'Any2', 3, True, True, True),
         dealer=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
         player=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
+        true_count=0,
     ):
         self.rules = Rules(*rules)
-        self.shoe = Shoe(self)
+        self.shoe = Shoe(self, true_count=true_count)
         self.dealer = Hand(self, 'Dealer', *dealer)
         self.player = Hand(self, 'Player', *player)
 
     def __repr__(self):
         return self.implied_name
 
-    def clear(self):
-        # Blow this object completely out of memory
-        self.player = None
-        self.dealer = None
-        self.shoe = None
-        # self.rules = None
+    def clear(self, indent=0):
+        """Blow this object out of memory. Also do any child states recursively."""
+        if self.next_states is not None:
+            for child_data in self.next_states.values():
+                for card_data in child_data.values():
+                    child = card_data['state']
+                    child.clear(indent=indent + 2)
+                    del child
+        self.shoe.deal = None
+        self.player.deal = None
+        self.dealer.deal = None
         super().clear()
         Node.pop_reference(self)
 
@@ -46,9 +54,9 @@ class Deal(Node):
         return f'{home_dir}/states/{rule_dir}/{count_dir}/{self.implied_name}.json'
 
     @staticmethod
-    def from_cards(cards):
+    def from_cards(cards, true_count=0):
         """Instantiate a Deal state using the cards supplied as if dealt in order."""
-        d = Deal()
+        d = Deal(true_count=0)
         for c in cards:
             d = d.new_deal(c)
         return d
@@ -56,6 +64,7 @@ class Deal(Node):
     @property
     def implied_name(self):
         return f'{self.rules.implied_name} [{str(self.dealer)}] {str(self.player)}'
+        # return f'{self.rules.implied_name} TC{self.shoe.true_count:+d} [{str(self.dealer)}] {str(self.player)}'
 
     @property
     def is_done(self):
@@ -69,17 +78,32 @@ class Deal(Node):
         return contents['deal']
 
     def new_deal(self, card='', surrendered=None, split=False, doubled=None, stand=None):
-        """Instantiate a child state from this one, with modifications as specified in args."""
+        """Check cache size first; if too large, exit to avoid memory overflow"""
+        cache_size = len(self.__class__._instances)
+        if cache_size > self.cache_limit:
+            log(f'Cache size {cache_size} > limit of {self.cache_limit}; exiting for restart...')
+            sys.exit(0)
+        """Instantiate child state from this one, with modifications as specified in args."""
         current_hand = self.next_hand
         sur = current_hand.surrendered if surrendered is None else surrendered
         dbl = current_hand.doubled if doubled is None else doubled
         std = current_hand.stand if stand is None else stand
         new_hand = current_hand.new_hand(card=card, surrendered=sur, split=split, doubled=dbl, stand=std)
         if self.next_player == 'Dealer':
-            d = Deal(rules=self.rules.instreams, dealer=new_hand.instreams, player=self.player.instreams)
+            d = Deal(
+                rules=self.rules.instreams,
+                dealer=new_hand.instreams,
+                player=self.player.instreams,
+                true_count=self.shoe.true_count,
+            )
         else:
-            d = Deal(rules=self.rules.instreams, dealer=self.dealer.instreams, player=new_hand.instreams)
-        # log_occasional(d)
+            d = Deal(
+                rules=self.rules.instreams,
+                dealer=self.dealer.instreams,
+                player=new_hand.instreams,
+                true_count=self.shoe.true_count,
+            )
+        log_occasional(f'Instantiated {d} ({cache_size} in cache)', seconds=10)
         return d
 
     @cached_property
@@ -232,6 +256,17 @@ class Deal(Node):
         with open(self.fpath, 'w') as fp:
             json.dump(data, fp, indent=4)
 
+    def show_refs(self):
+        """WARNING: VERY SLOW"""
+        gc.collect()
+        objs = gc.get_objects()
+        for i, o in enumerate(objs):
+            if self == o:
+                log(f'References for {self.implied_name}:')
+                log(f'  Object {i + 1} ({str(o)})')
+                for j, ref in enumerate(gc.get_referrers(o)):
+                    log(f'  Ref {j + 1}: {str(ref)[:300]}')
+
     @cached_property
     def state(self):
         result = {
@@ -245,13 +280,14 @@ class Deal(Node):
             'rules': self.rules.implied_name,
             'shoe': {
                 'cards': self.shoe.cards,
+                'true_count': self.shoe.true_count,
                 'pdf': self.shoe.pdf,
             },
             'valuation_leaf': self.valuation_leaf,
         }
         return result
 
-    @cached_property
+    @property
     def state_for_json(self):
         result = self.state_for_json_recursive(self.state)
         return result
@@ -295,7 +331,6 @@ class Deal(Node):
             node_tot = 0
             for card, card_data in state_data.items():
                 child_state = card_data['state']
-
                 """If child has valuation already saved to disk, retrieve and use that instead."""
                 child_val_cached = child_state.valuation_saved
                 if child_val_cached is not None:
@@ -304,24 +339,23 @@ class Deal(Node):
                 else:
                     child_val = child_state.valuation
                     """Cache valuations with lots of nodes for later retrieval"""
-                    if child_val[0]['nodes'] >= self.node_threshold:
-                        log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
+                    max_nodes = 0
+                    for child in child_val:
+                        max_nodes = max(max_nodes, child['nodes'])
+                    if max_nodes >= self.node_save_threshold:
+                        log(f'Saving {child_state.implied_name} ({max_nodes} max nodes)...')
                         child_state.save(save_valuation=True)
                     # We care particularly about starting hands
-                    elif child_state.player.num_cards <= 2 and not (
+                    elif child_state.player.num_cards <= 2 and child_state.dealer.num_cards <= 2 and not (
                         child_state.player.surrendered or
+                        child_state.player.split_count > 0 or
                         child_state.player.doubled or
                         child_state.player.stand
                     ):
-                        log(f'Saving computed valuation for {child_state.implied_name} ({child_val[0]["nodes"]} nodes)...')
+                        log(f'Saving starting hand {child_state.implied_name} ({max_nodes} max nodes)...')
                         child_state.save(save_valuation=True)
-                    # Once child states have been used, clear them from memory
-                    child_state.clear()
-                    Node.pop_reference(child_state)
-
                 val_tot += card_data['prob'] * child_val[0]['value']
                 node_tot += child_val[0]['nodes']
-
             result = {
                 'action': action,
                 'value': val_tot,
@@ -330,7 +364,6 @@ class Deal(Node):
             results.append(result)
         results = sorted(results, key=lambda r: r['value'], reverse=True)
         self.invalidate('next_states')
-        log_occasional(f'Deal instances in cache: {len(self.__class__._instances)}', seconds=10)
         return results
 
     @property
