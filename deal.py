@@ -332,13 +332,17 @@ class Deal(Node):
             for card, card_data in state_data.items():
                 child_state = card_data['state']
                 """If child has valuation already saved to disk, retrieve and use that instead."""
-                child_val_cached = child_state.valuation_saved
-                if child_val_cached is not None:
-                    log(f'Using cached valuation for {child_state.implied_name}...')
-                    child_val = child_val_cached
-                else:
+                if 'valuation' in child_state.__dict__:             # Already computed & cached in memory
+                    # log(f'Using cached valuation for {child_state.implied_name}...')
                     child_val = child_state.valuation
-                    """Cache valuations with lots of nodes for later retrieval"""
+                elif child_state.valuation_is_saved:                # Already computed & saved to disk
+                    child_val = child_state.valuation_saved
+                    log(f'Using saved valuation for {child_state.implied_name}...')
+                else:
+                    child_val = child_state.valuation               # Not yet computed; compute
+
+                """If valuation is for a starting hand or has many many nodes, save for later use"""
+                if not child_state.valuation_is_saved:
                     max_nodes = 0
                     for child in child_val:
                         max_nodes = max(max_nodes, child['nodes'])
@@ -354,6 +358,7 @@ class Deal(Node):
                     ):
                         log(f'Saving starting hand {child_state.implied_name} ({max_nodes} max nodes)...')
                         child_state.save(save_valuation=True)
+
                 val_tot += card_data['prob'] * child_val[0]['value']
                 node_tot += child_val[0]['nodes']
             result = {
@@ -365,6 +370,10 @@ class Deal(Node):
         results = sorted(results, key=lambda r: r['value'], reverse=True)
         self.invalidate('next_states')
         return results
+
+    @property
+    def valuation_is_saved(self):
+        return os.path.isfile(self.fpath)
 
     @property
     def valuation_saved(self):
