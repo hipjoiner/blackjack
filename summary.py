@@ -20,9 +20,9 @@ action_map = {
 rules_instr = (1.5, 6, False, 'Any2', 3, True, True, True)
 
 
-def starting_hands():
+def starting_hands(true_count=0):
     states = {}
-    d = Deal()
+    d = Deal(true_count=true_count)
     hands = []
     cd1_states = d.next_states['Deal']
     for cd1, child1 in cd1_states.items():
@@ -100,8 +100,8 @@ def choice(row, num, tag):
     return data[tag]
 
 
-def do_summary():
-    df = starting_hands()
+def do_summary(true_count=0):
+    df = starting_hands(true_count=true_count)
     df['psort'] = df.apply(lambda row: psort(row), axis=1)
     df['dsort'] = df.apply(lambda row: dsort(row), axis=1)
     df['total'] = df.apply(lambda row: row.state.player.total, axis=1)
@@ -138,9 +138,10 @@ def do_summary():
     pandas_format()
     print(df)
     print(df['prob'].sum())
-    df.to_excel(f'{home_dir}/analysis.xlsx', index=False)
+    df.to_excel(f'{home_dir}/analysis TC{true_count:+d}.xlsx', index=False)
 
 
 if __name__ == '__main__':
-    do_summary()
+    tc = 0
+    do_summary(true_count=tc)
 

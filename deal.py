@@ -13,7 +13,8 @@ from shoe import Shoe
 
 class Deal(Node):
     node_save_threshold = 25000
-    cache_limit = 4000000
+    # cache_limit = 4000000
+    cache_limit = 3000000
 
     def __init__(
         self,
@@ -56,15 +57,14 @@ class Deal(Node):
     @staticmethod
     def from_cards(cards, true_count=0):
         """Instantiate a Deal state using the cards supplied as if dealt in order."""
-        d = Deal(true_count=0)
+        d = Deal(true_count=true_count)
         for c in cards:
             d = d.new_deal(c)
         return d
 
     @property
     def implied_name(self):
-        return f'{self.rules.implied_name} [{str(self.dealer)}] {str(self.player)}'
-        # return f'{self.rules.implied_name} TC{self.shoe.true_count:+d} [{str(self.dealer)}] {str(self.player)}'
+        return f'{self.rules.implied_name} TC{self.shoe.true_count:+d} [{str(self.dealer)}] {str(self.player)}'
 
     @property
     def is_done(self):
