@@ -55,9 +55,15 @@ class Deal(Node):
         return f'{home_dir}/states/{rule_dir}/{count_dir}/{self.implied_name}.json'
 
     @staticmethod
-    def from_cards(cards, true_count=0):
+    def from_cards(
+        cards='',
+        rules=(1.5, 6, False, 'Any2', 3, True, True, True),
+        dealer=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
+        player=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), False, '', 0, False, False),
+        true_count=0
+    ):
         """Instantiate a Deal state using the cards supplied as if dealt in order."""
-        d = Deal(true_count=true_count)
+        d = Deal(rules=rules, dealer=dealer, player=player, true_count=true_count)
         for c in cards:
             d = d.new_deal(c)
         return d
