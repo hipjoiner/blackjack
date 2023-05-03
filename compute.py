@@ -18,7 +18,7 @@ def run_all_computations():
         late_surrender=True,
     )
     for tc in true_counts_to_run:
-        deal = Deal(rules=rules, true_count=tc)
+        deal = Deal(rules=rules.instreams, true_count=tc)
         if deal.valuation_saved is None:
             deal.save(save_valuation=True)
 
