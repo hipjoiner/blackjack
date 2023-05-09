@@ -3,39 +3,15 @@ Goal: compute exact expected values for Blackjack play
 
 
 TO DO T 25Apr23:
-* Continue work on summary output (to spreadsheet)
-  * Produce a Basic Strategy replication
-  * Produce similar format for action delta table
-  * Produce similar format for EV table, with total (house/player edge)
-* Figure out memory cleanup, to enable unattended runs
-  * Enable trace of Deal instantiation & cleanup
-  * Trace Hand instantiation & cleanup
-* Figure out computation & storage for shoes with altered counts
-  * Add instantiation arg for true count (default 0)
-  * Add to file signature, "TC3" or "TC-2", after rules but before dealer hand
-  * Fix fpath for hands w/ more than 2 cards
+* Summary output
+  * Consolidate hard totals (e.g. 79 and 6T; 69 and 78 and 5T, etc.)
+  * Go across TC runs to pull deviation output
+* Clean up storage
+  * Locate & delete states w/ fewer than N max nodes (e.g. 1,000,000)
+* Cross TC run analysis
+  * Construct EV line vs TC; find X-axis intersection: true count for EV-Zero
+  * Do similar for all deviation plays: find true count for change in play for each hand
 
-------------------------------------------------------------------------------------------------------------------------
-Hand play sequence
-
-1. Bettor card 1
-2. Dealer card up
-3. Bettor card 2
-4. Dealer card down
-5. Insurance offer
-6. Insurance acceptance
-7. Dealer check for blackjack; if yes, hand is over
-8. Bettor surrender; if yes, hand is over
-9. Bettor play option
-10. Bettor all busted; if yes, hand is over
-11. Dealer play option
-12. Hand is over
-13. Evaluate win/loss
-
-For any given deal state, the only important question is: is it terminal?
-Are no more cards needed?
-If true, compute EV.
-If not, construct subsequent states.
 
 ------------------------------------------------------------------------------------------------------------------------
 Table state
@@ -68,7 +44,7 @@ e.g.
 
 ------------------------------------------------------------------------------------------------------------------------
 Full state representation
-    <table state> <dealer state> <player state>
+    <table state> <true count> <dealer state> <player state>
 e.g.
-    BJ-6D-S17-DAS-D2-S3-RSA-S [6x] 38^V8x2
+    BJ-6D-S17-DAS-D2-S3-RSA-S TC+0 [6x] 38^V8x2
 

@@ -52,7 +52,7 @@ def manage_computes(status_df):
     log(f'Computes: {count} rep running (max {reps})')
     if count < reps:
         log(f'Launching 1 compute...')
-        os.system(f'start "Blackjack compute" python compute.py')
+        os.system(f'start "Blackjack compute" /min python compute.py')
 
 
 def fetch_running():
