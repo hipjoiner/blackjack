@@ -48,7 +48,7 @@ class Deal(Node):
     @property
     def fpath(self):
         rule_dir = str(self.rules)
-        count_dir = f'TC{self.shoe.true_count}'
+        count_dir = f'TC{self.shoe.true_count:+d}'
         cards_dir = self.dealer.cards[:2]
         if self.dealer.num_cards > 0:
             return f'{home_dir}/states/{rule_dir}/{count_dir}/{cards_dir}/{self.implied_name}.json'

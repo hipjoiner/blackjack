@@ -47,7 +47,7 @@ def log(txt):
 def log_occasional(txt, seconds=3):
     now = datetime.now()
     if not hasattr(log_occasional, 'last_time'):
-        log_occasional.last_time = now - timedelta(days=1)
+        log_occasional.last_time = now
     if now > log_occasional.last_time + timedelta(seconds=seconds):
         log(txt)
         log_occasional.last_time = now

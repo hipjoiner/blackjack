@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import sys
 
-from config import home_dir, pandas_format
+from config import pandas_format
 from deal import Deal
 from rules import Rules
 
@@ -81,7 +81,7 @@ def collect_data(true_count=0):
     df['value3'] = df.apply(lambda row: choice(row, 3, 'value'), axis=1)
     df['nodes3'] = df.apply(lambda row: choice(row, 3, 'nodes'), axis=1)
     df['ev3'] = df.apply(lambda row: row.prob * row.value3 if row.value3 != '-' else None, axis=1)
-    df['actions'] = df.apply(lambda row: f'{row.action1}/{row.action2}/{row.action3}', axis=1)
+    df['actions'] = df.apply(lambda row: f'{row.action1}/{row.action2}', axis=1)
     df = df.sort_values(['psort', 'dsort'])
     df = df[[
         'psort',
@@ -107,7 +107,6 @@ def collect_data(true_count=0):
         'ev3',
         'actions',
     ]]
-    # df.to_excel(f'{home_dir}/analysis TC{tc:+d}.xlsx', index=False)
     return df
 
 
@@ -134,40 +133,10 @@ def format_data(data_df, col):
     return df
 
 
-def format_play(data_df):
-    """Reproduce strategy chart-style format for showing correct play in all situations"""
-    cols = ['hand_type', 'phand', 'pcards', 'hand_label']
-    cols.extend(data_df['dcards'].drop_duplicates(ignore_index=True).to_list())
-    df = pd.DataFrame(columns=cols)
-    df['phand'] = data_df['phand']
-    df['pcards'] = data_df['pcards']
-    df = df.drop_duplicates(subset=['pcards'])
-    df['hand_type'] = df.apply(lambda row: hand_type(row), axis=1)
-    df['hand_label'] = df.apply(lambda row: hand_label(row), axis=1)
-    df = df.set_index('pcards')
-    # First fill: from rows of data_df, fill with all actions
-    for i, row in data_df.iterrows():
-        df.at[row.pcards, row.dcards] = row['actions']
-    # Consolidate hard total hands with different card composition (where play is identical)
-    df = df.drop_duplicates(subset=['hand_label', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax', 'AT'])
-    df = df.reset_index()
-    df = df.drop(['pcards', 'phand', 'AT'], axis=1)
-    df = df[~df['hand_label'].isin(['AT', '19', '18', '7', '6', '5'])]
-    # Add Surrender section
-    df_sur = df[df['hand_type'] == 'Hard Totals'].copy()
-    df_sur = df_sur[df_sur.stack().str.startswith('Surrender').dropna().unstack().any(axis=1).to_list()]
-    df_sur['hand_type'] = 'Surrender  '
-    df = pd.concat([df, df_sur])
-    df = df.set_index(['hand_type', 'hand_label'])
-    for col in ['2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax']:
-        df[col] = df.apply(lambda row: play_action(row, col), axis=1)
-    pandas_format()
-    for tag in ['Pairs      ', 'Soft Totals', 'Hard Totals', 'Surrender  ']:
-        print()
-        print(df[df.index.get_level_values(0) == tag].to_string(
-            index_names=False,
-            col_space=3,
-        ))
+def hand_distinct(row, df):
+    if len(df[(df['hand_type'] == row.hand_type) & (df['hand_label'] == row.hand_label)]) > 1:
+        return f'({row.pcards})'
+    return '    '
 
 
 def hand_label(row):
@@ -189,14 +158,14 @@ def hand_type(row):
 
 
 def play_action(row, col):
-    section = row.name[0].strip()
+    section = row.hand_type.strip()
     actions = str(row[col]).split('/')
     if section == 'Pairs':
-        return 'Y' if actions[0] == 'Split' else ''
+        return 'Y' if actions[0] == 'Split' else '.'
     elif section in ['Soft Totals', 'Hard Totals']:
         a1, a2 = actions[0], actions[1]
         if a1 == 'Surrender':
-            a1, a2 = actions[1], actions[2]
+            a1, a2 = actions[1], None
         if a1 == 'Hit':
             return 'H'
         if a1 == 'Stand':
@@ -204,7 +173,7 @@ def play_action(row, col):
         if a1 == 'Double':
             return 'Ds' if a2 == 'Stand' else 'Dh'
     elif section == 'Surrender':
-        return 'S' if actions[0] == 'Surrender' else ''
+        return 'S' if actions[0] == 'Surrender' else '.'
     else:
         raise ValueError(f'Unknown section {section}')
 
@@ -265,12 +234,6 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         tc = int(float(sys.argv[1]))
     data = collect_data(true_count=tc)
-    # print(f"Probability checksum: {result['prob'].sum()}")
-    # result = format_data(data, 'action1')
-    # result = format_data(data, 'actions')
-    format_play(data)
-    # result = format_data(data, 'ev1')
-    # result = format_data(data, 'value1')
-    # pandas_format()
-    # print(result)
-    # result.to_excel(f'{home_dir}/summary TC{tc:+d}.xlsx', index=False)
+    result = format_data(data, 'value1')
+    pandas_format()
+    print(result)
