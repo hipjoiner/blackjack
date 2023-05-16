@@ -41,7 +41,7 @@ def manage_computes(status_df):
         last_elapsed = done.iloc[0].elapsed
         h, m, s = last_elapsed.split(':')
         last_elapsed_secs = int(float(h)) * 3600 + int(float(m)) * 60 + int(float(s))
-        if last_finished_secs < 300:
+        if last_finished_secs < 120:
             if last_elapsed_secs < 30:
                 reps = 0
             else:

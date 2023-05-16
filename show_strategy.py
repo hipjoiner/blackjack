@@ -1,11 +1,23 @@
 import json
 import os
 import pandas as pd
-import sys
 
-from config import pandas_format
+from config import home_dir, log, pandas_format
 from deal import Deal
 from rules import Rules
+
+
+def find_complete_true_counts(rules):
+    rule_dir = f'{home_dir}/states/{rules}'
+    tcs = []
+    for tc_dir in os.listdir(rule_dir):
+        complete_fpath = f'{rule_dir}/{tc_dir}/{rules} {tc_dir} [] .json'
+        # log(f'Checking {complete_fpath}...')
+        if os.path.isfile(complete_fpath):
+            tc = int(float(tc_dir[2:]))
+            tcs.append(tc)
+    log(f'Complete true counts {tcs}')
+    return tcs
 
 
 def starting_hands(rules, true_counts):
@@ -111,6 +123,7 @@ def val_data(row):
 
 def collect_data(dfs):
     for tc in dfs.keys():
+        log(f'True count {tc:+.0f}...')
         df = dfs[tc]
         df['dsort'] = df.apply(lambda row: dsort(row), axis=1)
         df['psort'] = df.apply(lambda row: psort(row), axis=1)
@@ -191,7 +204,7 @@ def play_action(row, col):
     section = row.hand_type.strip()
     actions = str(row[col]).split('/')
     if section == 'Pairs':
-        return 'Spl' if actions[0] == 'Split' else '.'
+        return 'Sp' if actions[0] == 'Split' else 'N'
     elif section in ['Soft Totals', 'Hard Totals']:
         a1, a2 = actions[0], actions[1]
         if a1 == 'Surrender':
@@ -203,7 +216,7 @@ def play_action(row, col):
         if a1 == 'Double':
             return 'Ds' if a2 == 'Stand' else 'Dh'
     elif section == 'Surrender':
-        return 'Sur' if actions[0] == 'Surrender' else '.'
+        return 'Su' if actions[0] == 'Surrender' else 'N'
     else:
         raise ValueError(f'Unknown section {section}')
 
@@ -233,14 +246,23 @@ def calc_strategies_by_true_count(dfs):
         df = df.drop(['phand', 'AT'], axis=1)
         df = df[~df['hand_label'].isin(['AT', '19', '18', '7', '6', '5'])]
 
-        # Consolidate hard total hands with different card composition (where play is identical)
+        """Consolidate hard total hands with different card composition (where play is identical).
+         NOTE: we are consolidating ALL hands with same total here, waving away the possibility that differing
+         card composition could make a difference in optimal play (e.g., 2T or 39 vs 3: 2T hits but 39 stands).
+         The reasons are (1) we assume the difference for these corner cases in EV is tiny, and 
+         (2) it's easier to build an overall strategy chart (esp. considering deviations) by ignoring this
+         very special set of cases.
+        """
         df = df.drop_duplicates(
-            subset=['hand_type', 'hand_label', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax'],
+            subset=['hand_type', 'hand_label'],
+            keep='first',
         )
+        # subset=['hand_type', 'hand_label', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax'],
 
         # Add Surrender section
         df_sur = df[df['hand_type'] == 'Hard Totals']
-        df_sur = df_sur[df_sur.stack().str.startswith('Surrender').dropna().unstack().any(axis=1).to_list()]
+        # df_sur = df_sur[df_sur.stack().str.startswith('Surrender').dropna().unstack().any(axis=1).to_list()]
+        df_sur = df_sur[df_sur['hand_label'].isin(['15', '16', '17'])]
         df_sur['hand_type'] = 'Surrender  '
         df = pd.concat([df, df_sur])
 
@@ -256,14 +278,63 @@ def calc_strategies_by_true_count(dfs):
     return dfs
 
 
-def calc_strategy_with_deviations(dfs):
-    # FIXME: negatives in descending order, then positives in ascending order
-    keys = sorted(dfs.keys())
-    tc0 = keys.index(0)
-    neg = keys[:tc0][-1:0:-1]
-    pos = keys[tc0 + 1:]
-    df = dfs[0]
+def note_deviations(df, dfs, dev_tc):
+    for index, row in df.iterrows():
+        for col in ['2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax']:
+            try:
+                base_val = dfs[0].at[index, col]
+                dev_val = dfs[dev_tc].at[index, col]
+                if dev_val != base_val:
+                    # log(f'Comparing TC+0 to TC{dev_tc:+d}, {index[1]} vs {col}: {base_val} vs {dev_val}')
+                    dev_str = f'{base_val} ({dev_val}{dev_tc:+d})'
+                    if df.at[index, col] == base_val:
+                        df.at[index, col] = dev_str
+            except KeyError as e:
+                print(f'ERROR at {index}, {col}\n{e}')
+                indexes = dfs[dev_tc].index.get_locs([index[0], index[1], slice(None)])
+                print(f'Similar indexes:\n{dfs[dev_tc].iloc[indexes]}')
+                continue
     return df
+
+
+def calc_strategy_with_deviations(dfs):
+    """Negatives in descending order, then positives in ascending order"""
+    keys = sorted(dfs.keys())
+    tc0 = keys.index(0.0)
+    negs = keys[:tc0][::-1]
+    poss = keys[tc0 + 1:]
+    df = dfs[0].copy()
+    for dev_tc in negs:
+        df = note_deviations(df, dfs, dev_tc)
+    for dev_tc in poss:
+        df = note_deviations(df, dfs, dev_tc)
+    return df
+
+
+def print_strategy(df):
+    pandas_format()
+    for ht in ['Pairs', 'Soft Totals', 'Hard Totals', 'Surrender']:
+        print()
+        print(df[df.index.get_level_values(0).str.strip() == ht].to_string(
+            index_names=False,
+            col_space=10,
+            justify='center',
+            formatters={tag: lambda s: f'{s:10s}' for tag in ['2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', 'Tx', 'Ax']}
+        ))
+
+
+def main(rules):
+    log('True counts...')
+    true_counts = find_complete_true_counts(rules)
+    log('Starting hands frame...')
+    frames = starting_hands(rules=rules, true_counts=true_counts)
+    log('Collecting data...')
+    results = collect_data(frames)
+    log('Calc strategies by true count...')
+    strategies = calc_strategies_by_true_count(results)
+    log('Calc strategy w/ deviations...')
+    base_df = calc_strategy_with_deviations(strategies)
+    print_strategy(base_df)
 
 
 if __name__ == '__main__':
@@ -277,15 +348,4 @@ if __name__ == '__main__':
         resplit_aces=False,
         late_surrender=True,
     )
-    tcs = [0]
-    frames = starting_hands(rules=r, true_counts=tcs)
-    results = collect_data(frames)
-    strategies = calc_strategies_by_true_count(results)
-    base_df = calc_strategy_with_deviations(strategies)
-    pandas_format()
-    for tag in ['Pairs      ', 'Soft Totals', 'Hard Totals', 'Surrender  ']:
-        print()
-        print(base_df[base_df.index.get_level_values(0) == tag].to_string(
-            index_names=False,
-            col_space=5,
-        ))
+    main(r)
