@@ -8,8 +8,8 @@ from deal import Deal
 from rules import Rules
 
 
-shoe_decks_to_run = [8, 6, 4, 2]
-true_counts_to_run = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10]
+shoe_decks_to_run = [8, 4, 2, 6]
+true_counts_to_run = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]
 
 
 def run_all_computations():

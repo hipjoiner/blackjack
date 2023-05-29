@@ -1,6 +1,7 @@
 import json
 import os
 import pandas as pd
+import sys
 
 from config import home_dir, log, pandas_format
 from deal import Deal
@@ -204,7 +205,7 @@ def play_action(row, col):
     section = row.hand_type.strip()
     actions = str(row[col]).split('/')
     if section == 'Pairs':
-        return 'Sp' if actions[0] == 'Split' else 'N'
+        return 'Y' if actions[0] == 'Split' else '.'
     elif section in ['Soft Totals', 'Hard Totals']:
         a1, a2 = actions[0], actions[1]
         if a1 == 'Surrender':
@@ -214,9 +215,10 @@ def play_action(row, col):
         if a1 == 'Stand':
             return 'S'
         if a1 == 'Double':
-            return 'Ds' if a2 == 'Stand' else 'Dh'
+            # return 'Ds' if a2 == 'Stand' else 'Dh'
+            return 'D' if a2 == 'Stand' else 'D'
     elif section == 'Surrender':
-        return 'Su' if actions[0] == 'Surrender' else 'N'
+        return 'Su' if actions[0] == 'Surrender' else '.'
     else:
         raise ValueError(f'Unknown section {section}')
 
@@ -286,7 +288,8 @@ def note_deviations(df, dfs, dev_tc):
                 dev_val = dfs[dev_tc].at[index, col]
                 if dev_val != base_val:
                     # log(f'Comparing TC+0 to TC{dev_tc:+d}, {index[1]} vs {col}: {base_val} vs {dev_val}')
-                    dev_str = f'{base_val} ({dev_val}{dev_tc:+d})'
+                    # dev_str = f'{base_val} ({dev_val}{dev_tc:+d})'
+                    dev_str = f'{base_val}  ({dev_tc:+d})'
                     if df.at[index, col] == base_val:
                         df.at[index, col] = dev_str
             except KeyError as e:
@@ -311,8 +314,10 @@ def calc_strategy_with_deviations(dfs):
     return df
 
 
-def print_strategy(df):
+def print_strategy(rules, df):
     pandas_format()
+    print()
+    print(f'{rules}:')
     for ht in ['Pairs', 'Soft Totals', 'Hard Totals', 'Surrender']:
         print()
         print(df[df.index.get_level_values(0).str.strip() == ht].to_string(
@@ -334,13 +339,16 @@ def main(rules):
     strategies = calc_strategies_by_true_count(results)
     log('Calc strategy w/ deviations...')
     base_df = calc_strategy_with_deviations(strategies)
-    print_strategy(base_df)
+    print_strategy(rules, base_df)
 
 
 if __name__ == '__main__':
+    decks = 8
+    if len(sys.argv) > 1:
+        decks = int(float(sys.argv[1]))
     r = Rules(
         blackjack_pays=1.5,
-        shoe_decks=8,
+        shoe_decks=decks,
         hit_soft_17=True,
         double_allowed='Any2',
         splits_allowed=3,
