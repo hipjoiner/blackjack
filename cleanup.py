@@ -67,10 +67,10 @@ def remove_files(buckets, size_threshold):
         if b['threshold'] <= size_threshold:
             print()
             log(f"Deleting {b['file_count']} files ({b['bytes']} bytes) w/ fewer than {b['threshold']} nodes:")
-            files = sorted(b['files'][:20])
+            files = sorted(b['files'])
             for fpath in files:
                 log(f'{fpath}...')
-                # os.remove(fpath)
+                os.remove(fpath)
 
 
 def cleanup(rules, size_threshold):
@@ -78,7 +78,6 @@ def cleanup(rules, size_threshold):
     tc_dirs = os.listdir(base_dir)
     buckets = None
     for tc_dir in tc_dirs:
-        true_count = int(float(tc_dir[-1]))
         true_count_dir = f'{home_dir}/states/{rules.implied_name}/{tc_dir}'
         log(true_count_dir)
         for dirpath, dirnames, filenames in os.walk(true_count_dir):
