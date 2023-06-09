@@ -1,5 +1,4 @@
 import os
-import sys
 
 from config import home_dir, log
 from rules import Rules
@@ -10,13 +9,20 @@ def rename_all_files_under(true_count_dir, tc_dir):
     for dirpath, dirnames, filenames in os.walk(true_count_dir):
         sub_dir = dirpath.replace('\\', '/')
         for f in filenames:
+            if '.0' in f:
+                continue
             fpath = f'{sub_dir}/{f}'
             tc_index = f.index(tc_dir)
             fixed = 4
             new_f = f'{f[:tc_index + fixed]}.0{f[tc_index + fixed:]}'
             new_fpath = f'{sub_dir}/{new_f}'
             log(f'{fpath:60} --> {new_fpath}')
-            os.rename(fpath, new_fpath)
+            try:
+                os.rename(fpath, new_fpath)
+            except FileExistsError:
+                log(f'WARNING: target exists; removing for rename: {new_fpath}')
+                os.remove(new_fpath)
+                os.rename(fpath, new_fpath)
 
 
 def walk_tree(rules):
@@ -33,12 +39,9 @@ def walk_tree(rules):
 
 
 if __name__ == '__main__':
-    decks = 8
-    if len(sys.argv) > 1:
-        decks = int(float(sys.argv[1]))
     r = Rules(
         blackjack_pays=1.5,
-        shoe_decks=decks,
+        shoe_decks=4,
         hit_soft_17=True,
         double_allowed='Any2',
         splits_allowed=3,
